@@ -1,0 +1,31 @@
+# DRISHTIGUIDE AI — Custom YOLO Assistive Vision Dataset Configuration
+path: ../datasets
+train: train/images
+val: val/images
+test: test/images
+
+# 23 Navigational & Hazard Classes
+names:
+  0: person
+  1: car
+  2: bus
+  3: truck
+  4: motorcycle
+  5: bicycle
+  6: stairs
+  7: door
+  8: chair
+  9: table
+  10: pole
+  11: curb
+  12: pothole
+  13: open_drain
+  14: barrier
+  15: traffic_light
+  16: traffic_sign
+  17: pedestrian_crossing
+  18: animal
+  19: bag
+  20: wall
+  21: bench
+  22: trash_bin

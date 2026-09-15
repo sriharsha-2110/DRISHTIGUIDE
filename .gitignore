@@ -1,0 +1,34 @@
+# Dependencies & Node
+node_modules/
+frontend/node_modules/
+package-lock.json
+
+# Python Virtual Environment & Caches
+venv/
+backend/venv/
+__pycache__/
+backend/app/__pycache__/
+backend/app/*/__pycache__/
+backend/tests/__pycache__/
+.pytest_cache/
+backend/.pytest_cache/
+*.pyc
+*.pyo
+
+# Build Outputs
+dist/
+frontend/dist/
+build/
+*.egg-info/
+
+# Environment & Secret Files
+.env
+backend/.env
+.DS_Store
+Thumbs.db
+
+# Large Model Weights & Runs (except configs/sample metrics)
+models/runs/
+*.onnx
+*.engine
+*.tflite

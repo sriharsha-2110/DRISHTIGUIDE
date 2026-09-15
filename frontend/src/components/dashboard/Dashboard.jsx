@@ -1,28 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Eye, Activity, Cpu, Database, AlertOctagon, History, Settings,
-  Play, Pause, Upload, Camera, ArrowRight, ShieldCheck, ShieldAlert, CheckCircle2, XCircle
+  Eye, Cpu, Database, AlertOctagon, Activity, Play, Pause, Upload, Camera,
+  CheckCircle2, AlertTriangle, Layers, Filter, Image as ImageIcon
 } from 'lucide-react';
-import { checkHealth, getModelInfo, getMetrics, analyzeImageBlob } from '../../services/api';
+import { checkHealth, getModelInfo, getMetrics, getDatasetInfo, analyzeImageBlob } from '../../services/api';
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('live');
+  const [activeTab, setActiveTab] = useState('overview');
   const [healthStatus, setHealthStatus] = useState(null);
   const [modelInfo, setModelInfo] = useState(null);
   const [metricsData, setMetricsData] = useState(null);
+  const [datasetData, setDatasetData] = useState(null);
 
   // Live vision & inference states
   const [isWebcamActive, setIsWebcamActive] = useState(false);
   const [currentFrameResults, setCurrentFrameResults] = useState(null);
-  const [guidanceLogs, setGuidanceLogs] = useState([]);
-  const [selectedClassCM, setSelectedClassCM] = useState('stairs');
+  const [selectedDatasetFilter, setSelectedDatasetFilter] = useState('All');
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const intervalRef = useRef(null);
 
-  // Fetch initial data
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -34,9 +33,10 @@ export default function Dashboard() {
     setModelInfo(m);
     const met = await getMetrics();
     setMetricsData(met);
+    const ds = await getDatasetInfo();
+    setDatasetData(ds);
   };
 
-  // Toggle Live Webcam Feed
   const toggleWebcam = async () => {
     if (isWebcamActive) {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -54,7 +54,7 @@ export default function Dashboard() {
         setIsWebcamActive(true);
         intervalRef.current = setInterval(processWebcamFrame, 1500);
       } catch (e) {
-        alert("Webcam error: " + e.message);
+        alert("Webcam access error: " + e.message);
       }
     }
   };
@@ -77,7 +77,6 @@ export default function Dashboard() {
     }, 'image/jpeg', 0.85);
   };
 
-  // Handle uploaded image file
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -103,21 +102,6 @@ export default function Dashboard() {
   const handleInferenceResponse = (res, canvas, ctx) => {
     setCurrentFrameResults(res);
     drawBoundingBoxes(ctx, res.detections || [], canvas.width, canvas.height);
-
-    if (res.instruction) {
-      setGuidanceLogs(prev => [
-        {
-          timestamp: new Date().toLocaleTimeString(),
-          instruction: res.instruction,
-          risk_level: res.risk_level,
-          priority: res.priority,
-          object: res.detections?.[0]?.class || 'Hazard',
-          confidence: res.detections?.[0]?.confidence || 0.95,
-          reason: res.reason
-        },
-        ...prev.slice(0, 49) // Keep last 50 logs
-      ]);
-    }
   };
 
   const drawBoundingBoxes = (ctx, detections, imgW, imgH) => {
@@ -126,18 +110,15 @@ export default function Dashboard() {
       const width = x2 - x1;
       const height = y2 - y1;
 
-      // Color coding by risk level
       let strokeColor = '#10b981'; // safe green
       if (d.risk_level === 'CRITICAL') strokeColor = '#ef4444';
       else if (d.risk_level === 'HIGH') strokeColor = '#f97316';
       else if (d.risk_level === 'CAUTION') strokeColor = '#eab308';
 
-      // Draw box
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 3;
       ctx.strokeRect(x1, y1, width, height);
 
-      // Draw label background
       const labelText = `${d.class.toUpperCase()} ${(d.confidence * 100).toFixed(0)}% [${d.position} | ${d.distance}]`;
       ctx.font = 'bold 13px Inter, sans-serif';
       const textWidth = ctx.measureText(labelText).width;
@@ -145,7 +126,6 @@ export default function Dashboard() {
       ctx.fillStyle = strokeColor;
       ctx.fillRect(x1, y1 > 24 ? y1 - 24 : y1, textWidth + 12, 24);
 
-      // Draw text
       ctx.fillStyle = d.risk_level === 'CAUTION' ? '#000000' : '#ffffff';
       ctx.fillText(labelText, x1 + 6, y1 > 24 ? y1 - 7 : y1 + 17);
     });
@@ -153,14 +133,10 @@ export default function Dashboard() {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Eye },
-    { id: 'live', label: 'Live Vision', icon: Camera },
-    { id: 'explanation', label: 'AI Explanation', icon: AlertOctagon },
-    { id: 'performance', label: 'Model Specs', icon: Cpu },
-    { id: 'training', label: 'Training & Loss', icon: Database },
-    { id: 'confusion', label: 'Confusion Matrix', icon: Activity },
-    { id: 'analytics', label: 'Safety Analytics', icon: ShieldAlert },
-    { id: 'logs', label: 'Guidance Log', icon: History },
-    { id: 'system', label: 'System & Config', icon: Settings },
+    { id: 'dataset', label: 'Dataset', icon: Database },
+    { id: 'performance', label: 'Model Performance', icon: Cpu },
+    { id: 'live', label: 'Live Detection', icon: Camera },
+    { id: 'explanation', label: 'AI Decision', icon: AlertOctagon },
   ];
 
   return (
@@ -174,27 +150,28 @@ export default function Dashboard() {
           </div>
           <div>
             <h1 className="text-xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">
-              DRISHTIGUIDE AI — AI RESEARCH CENTER
+              DRISHTIGUIDE AI — DEEP LEARNING DASHBOARD
             </h1>
-            <p className="text-xs text-slate-400">Deep Learning Performance, Spatial Analytics & Priority Risk Guidance</p>
+            <p className="text-xs text-slate-400">"DrishtiGuide AI: A Deep Learning-Based Visual Assistance System for Visually Impaired People"</p>
           </div>
         </div>
 
-        {/* Status Indicators */}
-        <div className="flex items-center space-x-4">
+        {/* Model Status Badge */}
+        <div className="flex items-center space-x-3">
+          <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border uppercase tracking-wider ${
+            modelInfo?.is_custom ? 'bg-purple-950/80 border-purple-500/50 text-purple-300' : 'bg-cyan-950/80 border-cyan-500/50 text-cyan-300'
+          }`}>
+            {modelInfo?.model_type || 'PRETRAINED MODEL (YOLOv8 Nano)'}
+          </span>
           <div className="flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-            <span className={`w-2 h-2 rounded-full ${healthStatus?.status === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`}></span>
-            <span className="text-slate-300 font-semibold">Backend: {healthStatus?.status === 'online' ? 'ONLINE' : 'OFFLINE'}</span>
-          </div>
-          <div className="flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-            <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-slate-300 font-semibold">{modelInfo?.model_name || 'yolov8n.pt'}</span>
+            <span className={`w-2 h-2 rounded-full ${healthStatus?.status === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+            <span className="text-slate-300 font-semibold">{healthStatus?.status === 'online' ? 'AI ONLINE' : 'CONNECTING...'}</span>
           </div>
         </div>
       </header>
 
-      {/* Main Tab Navigation */}
-      <nav className="bg-slate-900/60 border-b border-slate-800 px-6 flex items-center space-x-1 overflow-x-auto">
+      {/* 5 Tab Navigation */}
+      <nav className="bg-slate-900/60 border-b border-slate-800 px-6 flex items-center space-x-2">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -202,7 +179,7 @@ export default function Dashboard() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+              className={`flex items-center space-x-2 px-5 py-3.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
                 isActive
                   ? 'border-cyan-400 text-cyan-400 bg-cyan-950/20'
                   : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -217,8 +194,6 @@ export default function Dashboard() {
 
       {/* Tab Contents */}
       <main className="flex-1 p-6 space-y-6 max-w-7xl w-full mx-auto">
-        
-        {/* Hidden media elements */}
         <video ref={videoRef} className="hidden" playsInline muted />
         
         {/* 1. OVERVIEW TAB */}
@@ -227,62 +202,176 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                 <span className="text-xs text-slate-400 uppercase font-semibold">Model Status</span>
-                <div className="text-2xl font-bold text-emerald-400 mt-1 flex items-center space-x-2">
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>{modelInfo?.status || 'ONLINE'}</span>
+                <div className="text-xl font-extrabold text-cyan-400 mt-1">
+                  {modelInfo?.status || 'ONLINE'}
                 </div>
-                <div className="text-xs text-slate-500 mt-1">{modelInfo?.model_type || 'YOLOv8 Nano'}</div>
+                <div className="text-xs text-slate-500 mt-1">{modelInfo?.model_type || 'Pretrained YOLOv8 Nano'}</div>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-                <span className="text-xs text-slate-400 uppercase font-semibold">Inference Speed</span>
-                <div className="text-2xl font-bold text-cyan-400 mt-1">
+                <span className="text-xs text-slate-400 uppercase font-semibold">Dataset Size</span>
+                <div className="text-xl font-extrabold text-white mt-1">
+                  {datasetData?.configured ? `${datasetData.total_images} Images` : 'N/A (Unconfigured)'}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">{datasetData?.configured ? 'Custom YOLO Annotations' : 'Dataset not loaded'}</div>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                <span className="text-xs text-slate-400 uppercase font-semibold">Inference Latency</span>
+                <div className="text-xl font-extrabold text-emerald-400 mt-1">
                   {currentFrameResults?.processing_time_ms ? `${currentFrameResults.processing_time_ms} ms` : '14.2 ms'}
                 </div>
-                <div className="text-xs text-slate-500 mt-1">~70.4 FPS (CPU standard)</div>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-                <span className="text-xs text-slate-400 uppercase font-semibold">Current Risk Level</span>
-                <div className={`text-2xl font-black mt-1 ${
-                  currentFrameResults?.risk_level === 'CRITICAL' ? 'text-red-500 animate-pulse' :
-                  currentFrameResults?.risk_level === 'HIGH' ? 'text-amber-500' :
-                  currentFrameResults?.risk_level === 'CAUTION' ? 'text-yellow-400' : 'text-emerald-400'
-                }`}>
-                  {currentFrameResults?.risk_level || 'SAFE'}
-                </div>
-                <div className="text-xs text-slate-500 mt-1">Risk Score: {currentFrameResults?.risk_score || 0}/100</div>
+                <div className="text-xs text-slate-500 mt-1">Lightweight CPU execution</div>
               </div>
 
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                 <span className="text-xs text-slate-400 uppercase font-semibold">Active Classes</span>
-                <div className="text-2xl font-bold text-blue-400 mt-1">
-                  {metricsData?.training?.total_classes || 23} Classes
+                <div className="text-xl font-extrabold text-blue-400 mt-1">
+                  {modelInfo?.classes_count || 23} Classes
                 </div>
                 <div className="text-xs text-slate-500 mt-1">Assistive Navigation Scope</div>
               </div>
             </div>
 
-            {/* Active Guidance Card */}
+            {/* Current Guidance Banner */}
             <div className="bg-gradient-to-r from-slate-900 to-cyan-950 border border-cyan-500/30 p-6 rounded-2xl flex items-center justify-between">
               <div>
-                <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Latest Spoken AI Guidance</span>
+                <span className="text-xs font-extrabold text-cyan-400 uppercase tracking-widest block">Current AI Guidance</span>
                 <div className="text-2xl font-black text-white mt-1">
-                  "{currentFrameResults?.instruction || 'System ready. No high priority hazards in path.'}"
+                  "{currentFrameResults?.instruction || 'System ready. Waiting for environmental frame.'}"
                 </div>
               </div>
               <div className="px-4 py-2 bg-slate-800 rounded-xl text-xs font-bold text-cyan-300 border border-slate-700">
-                Priority: {currentFrameResults?.priority || 'NORMAL'}
+                Risk: {currentFrameResults?.risk_level || 'SAFE'}
               </div>
             </div>
           </div>
         )}
 
-        {/* 2. LIVE VISION TAB */}
+        {/* 2. DATASET TAB */}
+        {activeTab === 'dataset' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                  <Database className="w-5 h-5 text-cyan-400" />
+                  <span>CUSTOM NAVIGATION DATASET</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">Scans datasets directory for images, splits, and class annotations.</p>
+              </div>
+
+              {/* Class Filter */}
+              {datasetData?.configured && (
+                <div className="flex items-center space-x-2 text-xs">
+                  <Filter className="w-4 h-4 text-cyan-400" />
+                  <span className="text-slate-400">Filter Class:</span>
+                  <select
+                    value={selectedDatasetFilter}
+                    onChange={(e) => setSelectedDatasetFilter(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 text-cyan-300 font-bold rounded-lg px-3 py-1.5"
+                  >
+                    <option value="All">All Classes</option>
+                    <option value="Person">Person</option>
+                    <option value="Stairs">Stairs</option>
+                    <option value="Door">Door</option>
+                    <option value="Pothole">Pothole</option>
+                    <option value="Vehicle">Vehicle</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {!datasetData?.configured ? (
+              <div className="text-center py-16 space-y-3 bg-slate-950/60 rounded-2xl border border-slate-800">
+                <ImageIcon className="w-12 h-12 text-slate-600 mx-auto" />
+                <h3 className="text-lg font-bold text-slate-300">Dataset not configured.</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  To train a custom model, populate <code className="text-cyan-400 bg-slate-900 px-1.5 py-0.5 rounded">datasets/train/</code>, <code className="text-cyan-400 bg-slate-900 px-1.5 py-0.5 rounded">datasets/val/</code>, and <code className="text-cyan-400 bg-slate-900 px-1.5 py-0.5 rounded">datasets/test/</code> with YOLO formatted image-label pairs.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-center">
+                  <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700"><span className="text-slate-400 block">Total Images</span><strong className="text-base text-white">{datasetData.total_images}</strong></div>
+                  <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700"><span className="text-slate-400 block">Training Split</span><strong className="text-base text-cyan-400">{datasetData.splits?.train}</strong></div>
+                  <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700"><span className="text-slate-400 block">Validation Split</span><strong className="text-base text-blue-400">{datasetData.splits?.val}</strong></div>
+                  <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700"><span className="text-slate-400 block">Test Split</span><strong className="text-base text-purple-400">{datasetData.splits?.test}</strong></div>
+                </div>
+
+                {/* Image Gallery */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {datasetData.samples
+                    ?.filter(s => selectedDatasetFilter === 'All' || s.class.toLowerCase().includes(selectedDatasetFilter.toLowerCase()))
+                    .map((s, idx) => (
+                      <div key={idx} className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 space-y-2 p-2">
+                        <div className="aspect-video bg-slate-950 rounded flex items-center justify-center text-xs text-slate-500 font-mono">
+                          {s.filename}
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] px-1">
+                          <span className="font-extrabold text-cyan-300 uppercase">{s.class}</span>
+                          <span className="bg-slate-900 px-2 py-0.5 rounded text-slate-400 font-bold">{s.split}</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 3. MODEL PERFORMANCE TAB */}
+        {activeTab === 'performance' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+            <h2 className="text-sm font-black text-slate-200 uppercase tracking-wider flex items-center space-x-2 border-b border-slate-800 pb-3">
+              <Cpu className="w-5 h-5 text-cyan-400" />
+              <span>EVALUATION METRICS</span>
+            </h2>
+
+            {!metricsData?.evaluation_available ? (
+              <div className="text-center py-16 space-y-3 bg-slate-950/60 rounded-2xl border border-slate-800">
+                <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto" />
+                <h3 className="text-lg font-bold text-slate-300">Custom model evaluation not available.</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Run <code className="text-cyan-400 bg-slate-900 px-1.5 py-0.5 rounded">python training/validate.py</code> after training to generate actual precision, recall, mAP, and confusion matrix statistics.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <span className="text-xs text-slate-400 uppercase font-bold">Precision</span>
+                    <div className="text-3xl font-black text-cyan-400 mt-1">{(metricsData.metrics.precision * 100).toFixed(1)}%</div>
+                  </div>
+                  <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <span className="text-xs text-slate-400 uppercase font-bold">Recall</span>
+                    <div className="text-3xl font-black text-cyan-400 mt-1">{(metricsData.metrics.recall * 100).toFixed(1)}%</div>
+                  </div>
+                  <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <span className="text-xs text-slate-400 uppercase font-bold">mAP@50</span>
+                    <div className="text-3xl font-black text-emerald-400 mt-1">{(metricsData.metrics.map50 * 100).toFixed(1)}%</div>
+                  </div>
+                  <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <span className="text-xs text-slate-400 uppercase font-bold">mAP@50-95</span>
+                    <div className="text-3xl font-black text-blue-400 mt-1">{(metricsData.metrics.map50_95 * 100).toFixed(1)}%</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                  <div className="bg-slate-800/60 p-3 rounded-lg"><span className="text-slate-400 block">Parameter Count</span><strong className="text-white text-base">3.15M</strong></div>
+                  <div className="bg-slate-800/60 p-3 rounded-lg"><span className="text-slate-400 block">GFLOPs</span><strong className="text-white text-base">8.7 GFLOPs</strong></div>
+                  <div className="bg-slate-800/60 p-3 rounded-lg"><span className="text-slate-400 block">Inference Speed</span><strong className="text-white text-base">{metricsData.metrics.inference_time_ms} ms</strong></div>
+                  <div className="bg-slate-800/60 p-3 rounded-lg"><span className="text-slate-400 block">F1 Score</span><strong className="text-white text-base">{metricsData.metrics.f1_score}</strong></div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 4. LIVE DETECTION TAB */}
         {activeTab === 'live' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* Camera / Image Feed Display */}
+            {/* Viewport */}
             <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
@@ -318,18 +407,16 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Canvas viewport */}
               <div className="relative aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center border border-slate-800">
                 <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
                 {!currentFrameResults && !isWebcamActive && (
                   <div className="text-center p-6 space-y-2">
                     <Camera className="w-12 h-12 text-slate-600 mx-auto" />
-                    <p className="text-slate-400 text-sm">Start laptop webcam or upload an image to run live analysis.</p>
+                    <p className="text-slate-400 text-sm">Start webcam or upload an image to run live detection.</p>
                   </div>
                 )}
               </div>
 
-              {/* Detection Summary Pill Row */}
               {currentFrameResults && (
                 <div className="flex items-center justify-between text-xs bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
                   <span className="text-slate-400">Detections: <strong className="text-white">{currentFrameResults.detections?.length || 0} objects</strong></span>
@@ -339,11 +426,10 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* AI Decision Panel */}
+            {/* Detections Summary */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-              <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2 border-b border-slate-800 pb-3">
-                <AlertOctagon className="w-4 h-4 text-cyan-400" />
-                <span>Detection Breakdown</span>
+              <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-3">
+                Detected Objects Summary
               </h2>
 
               {currentFrameResults?.detections?.length > 0 ? (
@@ -366,21 +452,13 @@ export default function Dashboard() {
                           <span className="text-slate-400 block text-[10px] uppercase">Approx Distance</span>
                           <span className="font-bold text-slate-200">{d.distance}</span>
                         </div>
-                        <div className="bg-slate-900/60 p-2 rounded border border-slate-700/50">
-                          <span className="text-slate-400 block text-[10px] uppercase">Movement</span>
-                          <span className="font-bold text-slate-200">{d.movement}</span>
-                        </div>
-                        <div className="bg-slate-900/60 p-2 rounded border border-slate-700/50">
-                          <span className="text-slate-400 block text-[10px] uppercase">Risk Score</span>
-                          <span className="font-bold text-amber-400">{d.risk_score}/100 ({d.risk_level})</span>
-                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-12 text-slate-500 text-xs">
-                  No detection data available for this frame.
+                  No objects detected in current frame.
                 </div>
               )}
             </div>
@@ -388,241 +466,52 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 3. AI DECISION EXPLANATION TAB */}
+        {/* 5. AI DECISION TAB */}
         {activeTab === 'explanation' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
             <div>
               <h2 className="text-lg font-extrabold text-cyan-400 uppercase tracking-wider flex items-center space-x-2">
                 <AlertOctagon className="w-5 h-5 text-cyan-400" />
-                <span>WHY DID AI GIVE THIS WARNING?</span>
+                <span>WHY DID AI GIVE THIS INSTRUCTION?</span>
               </h2>
               <p className="text-xs text-slate-400 mt-1">
-                Transparent step-by-step reasoning trace explaining how computer vision inputs translate into prioritized voice alerts.
+                Visual explanation trace demonstrating priority filtering from object detection to earphone speech.
               </p>
             </div>
 
-            {/* Decision Pipeline Flowchart */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4">
               <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-2">
-                <span className="text-xs text-slate-400 uppercase font-bold">Step 1: Object & Conf</span>
+                <span className="text-xs text-slate-400 uppercase font-bold">Step 1: Detection</span>
                 <div className="text-lg font-black text-cyan-300">
-                  {currentFrameResults?.detections?.[0]?.class?.toUpperCase() || 'VEHICLE'} ({(currentFrameResults?.detections?.[0]?.confidence * 100 || 94).toFixed(0)}%)
+                  {currentFrameResults?.detections?.[0]?.class?.toUpperCase() || 'STAIRS'} ({(currentFrameResults?.detections?.[0]?.confidence * 100 || 96).toFixed(0)}%)
                 </div>
               </div>
 
               <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-2">
-                <span className="text-xs text-slate-400 uppercase font-bold">Step 2: Spatial & Distance</span>
+                <span className="text-xs text-slate-400 uppercase font-bold">Step 2: Position & Distance</span>
                 <div className="text-lg font-black text-slate-200">
                   {currentFrameResults?.detections?.[0]?.position || 'CENTER'} | {currentFrameResults?.detections?.[0]?.distance || 'NEAR'}
                 </div>
               </div>
 
               <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-2">
-                <span className="text-xs text-slate-400 uppercase font-bold">Step 3: Movement & Path</span>
+                <span className="text-xs text-slate-400 uppercase font-bold">Step 3: Risk & Priority</span>
                 <div className="text-lg font-black text-amber-400">
-                  {currentFrameResults?.movement || 'APPROACHING'}
+                  {currentFrameResults?.risk_level || 'HIGH'} PRIORITY
                 </div>
               </div>
 
-              <div className="bg-slate-800 p-4 rounded-xl border-2 border-red-500/50 space-y-2">
-                <span className="text-xs text-slate-400 uppercase font-bold">Step 4: Priority & Voice Output</span>
-                <div className="text-lg font-black text-red-400">
-                  "{currentFrameResults?.instruction || 'STOP. Vehicle approaching.'}"
+              <div className="bg-slate-800 p-4 rounded-xl border-2 border-cyan-500/50 space-y-2">
+                <span className="text-xs text-slate-400 uppercase font-bold">Step 4: Earphone Voice Guidance</span>
+                <div className="text-lg font-black text-cyan-300">
+                  "{currentFrameResults?.instruction || 'Stairs ahead. Move carefully.'}"
                 </div>
               </div>
             </div>
 
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-2 text-slate-300">
               <strong className="text-cyan-400 block uppercase">Reasoning Audit Log:</strong>
-              <p>{currentFrameResults?.reason || "Vehicle detected in center walking path approaching user at high speed. Evaluated risk score 91 (CRITICAL). Triggered emergency speech override."}</p>
-            </div>
-          </div>
-        )}
-
-        {/* 4. MODEL PERFORMANCE TAB */}
-        {activeTab === 'performance' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                <span className="text-xs text-slate-400 uppercase font-bold">Precision</span>
-                <div className="text-3xl font-black text-cyan-400 mt-1">{(metricsData?.metrics?.precision * 100 || 89.2).toFixed(1)}%</div>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                <span className="text-xs text-slate-400 uppercase font-bold">Recall</span>
-                <div className="text-3xl font-black text-cyan-400 mt-1">{(metricsData?.metrics?.recall * 100 || 86.5).toFixed(1)}%</div>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                <span className="text-xs text-slate-400 uppercase font-bold">mAP@50</span>
-                <div className="text-3xl font-black text-emerald-400 mt-1">{(metricsData?.metrics?.map50 * 100 || 91.4).toFixed(1)}%</div>
-              </div>
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                <span className="text-xs text-slate-400 uppercase font-bold">mAP@50-95</span>
-                <div className="text-3xl font-black text-blue-400 mt-1">{(metricsData?.metrics?.map50_95 * 100 || 72.8).toFixed(1)}%</div>
-              </div>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-              <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">Deep Learning Architecture Metrics</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                <div className="bg-slate-800/60 p-3 rounded-lg"><span className="text-slate-400 block">Parameter Count</span><strong className="text-slate-100 text-base">3.15M (Lightweight)</strong></div>
-                <div className="bg-slate-800/60 p-3 rounded-lg"><span className="text-slate-400 block">GFLOPs</span><strong className="text-slate-100 text-base">8.7 GFLOPs</strong></div>
-                <div className="bg-slate-800/60 p-3 rounded-lg"><span className="text-slate-400 block">Inference Speed</span><strong className="text-slate-100 text-base">14.2 ms (~70 FPS)</strong></div>
-                <div className="bg-slate-800/60 p-3 rounded-lg"><span className="text-slate-400 block">F1 Score</span><strong className="text-slate-100 text-base">0.878</strong></div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 5. TRAINING & LOSS TAB */}
-        {activeTab === 'training' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Training & Loss Progression</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="bg-slate-800/60 p-4 rounded-xl">
-                <span className="text-slate-400 block">Total Epochs</span>
-                <strong className="text-lg text-white">{metricsData?.training?.epochs || 100} Epochs (Best: {metricsData?.training?.best_epoch || 87})</strong>
-              </div>
-              <div className="bg-slate-800/60 p-4 rounded-xl">
-                <span className="text-slate-400 block">Training Dataset Size</span>
-                <strong className="text-lg text-white">{metricsData?.training?.train_images || 2450} Train / {metricsData?.training?.val_images || 520} Val Images</strong>
-              </div>
-              <div className="bg-slate-800/60 p-4 rounded-xl">
-                <span className="text-slate-400 block">Loss Progression</span>
-                <strong className="text-lg text-emerald-400">Converged (0.082 → 0.021)</strong>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 6. CONFUSION MATRIX TAB */}
-        {activeTab === 'confusion' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Class Confusion Matrix Breakdown</h2>
-              <select
-                value={selectedClassCM}
-                onChange={(e) => setSelectedClassCM(e.target.value)}
-                className="bg-slate-800 border border-slate-700 text-cyan-300 text-xs font-bold rounded-lg px-3 py-1.5"
-              >
-                {metricsData?.confusion_matrix?.classes?.map(c => (
-                  <option key={c} value={c}>{c.toUpperCase()}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="bg-emerald-950/40 border border-emerald-500/40 p-5 rounded-2xl">
-                <span className="text-xs text-emerald-400 font-bold uppercase">True Positive (TP)</span>
-                <div className="text-3xl font-black text-emerald-300 mt-2">142</div>
-                <p className="text-[11px] text-slate-400 mt-1">Correctly detected {selectedClassCM}</p>
-              </div>
-
-              <div className="bg-amber-950/40 border border-amber-500/40 p-5 rounded-2xl">
-                <span className="text-xs text-amber-400 font-bold uppercase">False Positive (FP)</span>
-                <div className="text-3xl font-black text-amber-300 mt-2">8</div>
-                <p className="text-[11px] text-slate-400 mt-1">Other objects misclassified as {selectedClassCM}</p>
-              </div>
-
-              <div className="bg-red-950/40 border border-red-500/40 p-5 rounded-2xl">
-                <span className="text-xs text-red-400 font-bold uppercase">False Negative (FN)</span>
-                <div className="text-3xl font-black text-red-300 mt-2">12</div>
-                <p className="text-[11px] text-slate-400 mt-1">{selectedClassCM} missed by model</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 7. SAFETY ANALYTICS TAB */}
-        {activeTab === 'analytics' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Safety Analytics & Hazard Metrics</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700">
-                <span className="text-xs text-slate-400 font-bold uppercase">Total Analyzed Frames</span>
-                <div className="text-2xl font-black text-cyan-400 mt-1">1,248 Frames</div>
-              </div>
-              <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700">
-                <span className="text-xs text-slate-400 font-bold uppercase">Critical Overrides Triggered</span>
-                <div className="text-2xl font-black text-red-400 mt-1">18 Alerts</div>
-              </div>
-              <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700">
-                <span className="text-xs text-slate-400 font-bold uppercase">Audio Clutter Suppressed</span>
-                <div className="text-2xl font-black text-emerald-400 mt-1">482 Repetitions</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 8. GUIDANCE LOG TAB */}
-        {activeTab === 'logs' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Real-Time Spoken Guidance Log History</h2>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-800 text-slate-400 uppercase font-bold border-b border-slate-700">
-                  <tr>
-                    <th className="p-3">Time</th>
-                    <th className="p-3">Spoken Instruction</th>
-                    <th className="p-3">Priority</th>
-                    <th className="p-3">Risk Level</th>
-                    <th className="p-3">Target Object</th>
-                    <th className="p-3">Reason</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {guidanceLogs.map((log, idx) => (
-                    <tr key={idx} className="hover:bg-slate-800/50">
-                      <td className="p-3 font-mono text-slate-400">{log.timestamp}</td>
-                      <td className="p-3 font-bold text-cyan-300">"{log.instruction}"</td>
-                      <td className="p-3 font-bold">{log.priority}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded font-bold ${
-                          log.risk_level === 'CRITICAL' ? 'bg-red-500/20 text-red-400' :
-                          log.risk_level === 'HIGH' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
-                        }`}>
-                          {log.risk_level}
-                        </span>
-                      </td>
-                      <td className="p-3 uppercase font-semibold">{log.object}</td>
-                      <td className="p-3 text-slate-400 truncate max-w-xs">{log.reason}</td>
-                    </tr>
-                  ))}
-                  {guidanceLogs.length === 0 && (
-                    <tr>
-                      <td colSpan="6" className="p-6 text-center text-slate-500">No voice instructions generated yet. Run live analysis to build log.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* 9. SYSTEM & CONFIG TAB */}
-        {activeTab === 'system' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">System Configuration Knobs</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-1">
-                <span className="text-slate-400 uppercase font-bold">Image Processing Resolution</span>
-                <div className="text-base font-bold text-white">640 x 480 (Configurable)</div>
-              </div>
-              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-1">
-                <span className="text-slate-400 uppercase font-bold">Frame Analysis Interval</span>
-                <div className="text-base font-bold text-white">4.0 seconds (Routine speech)</div>
-              </div>
-              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-1">
-                <span className="text-slate-400 uppercase font-bold">Confidence Threshold</span>
-                <div className="text-base font-bold text-white">0.45</div>
-              </div>
-              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-1">
-                <span className="text-slate-400 uppercase font-bold">API Endpoint URL</span>
-                <div className="text-base font-bold text-cyan-400">{import.meta.env.VITE_API_URL || 'http://localhost:8000'}</div>
-              </div>
+              <p>{currentFrameResults?.reason || "Stairs detected directly in center walking path at near distance. Evaluated risk score HIGH. Filtered out routine obstacles and triggered voice alert."}</p>
             </div>
           </div>
         )}

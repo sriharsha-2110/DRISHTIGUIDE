@@ -1,13 +1,14 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.config import settings
-from app.routes import health, detection, analysis, model_info, metrics
+from app.routes import health, detection, analysis, model_info, metrics, dataset
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="DRISHTIGUIDE AI — Let AI Be Your Eyes: Assistive Computer Vision & Priority Risk Guidance System."
+    description="DRISHTIGUIDE AI — Let AI Be Your Eyes: Deep Learning Visual Assistance System."
 )
 
 # Configure CORS Middleware
@@ -25,6 +26,12 @@ app.include_router(detection.router)
 app.include_router(analysis.router)
 app.include_router(model_info.router)
 app.include_router(metrics.router)
+app.include_router(dataset.router)
+
+# Mount datasets static folder if available
+datasets_path = os.path.join(os.path.dirname(__file__), "..", "..", "datasets")
+if os.path.exists(datasets_path):
+    app.mount("/datasets", StaticFiles(directory=datasets_path), name="datasets")
 
 @app.get("/")
 def read_root():

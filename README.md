@@ -1,186 +1,97 @@
 # DRISHTIGUIDE AI
 > **"Let AI Be Your Eyes."**  
-> *Full-Stack Deep Learning Assistive Vision & Priority Risk Guidance System*
+> *DrishtiGuide AI: A Deep Learning-Based Visual Assistance System for Visually Impaired People*
 
 ---
 
 ## 👁️ Project Overview
-**DRISHTIGUIDE AI** is a production-grade assistive vision prototype designed to empower visually impaired individuals with real-time, non-intrusive, spatial environmental awareness. Utilizing computer vision, temporal movement tracking, heuristic distance estimation, and dynamic risk scoring, the system converts complex camera streams into concise voice instructions delivered straight to connected Bluetooth earphones.
-
-Unlike conventional object-detection systems that continuously announce every visible item ("tree, wall, chair, sky"), DRISHTIGUIDE AI features an **Intelligent Guidance Priority Engine** that answers a single crucial question:
-> *"What information does the user actually need to know right now?"*
+**DrishtiGuide AI** is a Deep Learning-based visual assistance prototype designed to help visually impaired users interpret their surroundings through short, context-aware voice instructions. A smartphone camera acts as the prototype equivalent of a camera integrated into smart glasses, while Bluetooth earbuds provide the audio output. The system uses YOLO-based object detection, spatial positioning, approximate proximity estimation and priority-based risk analysis to determine which environmental information should be communicated to the user. A separate laptop dashboard provides dataset visualization, model evaluation metrics, live detection and AI decision explanations.
 
 ---
 
-## 🎯 Problem Statement & Motivation
-For over 253 million visually impaired people worldwide, independent navigation poses constant challenges from unexpected physical obstacles, staircases, potholes, open drains, and approaching traffic. Existing object-detection projects suffer from **audio clutter and cognitive overload**:
-1. **Unfiltered Announcements**: Describing 15 objects simultaneously confuses users during navigation.
-2. **Lack of Spatial & Temporal Context**: Knowing an object exists is useless without knowing if it lies directly in the walking path or is moving closer.
-3. **Audio Latency & Intrusiveness**: Slow edge processing or continuous repetitive speech prevents timely reactions during sudden dangers.
+## 📱 Mobile Assistance Workflow
+1. User connects Bluetooth earbuds to smartphone.
+2. User opens the application on mobile browser and taps **`[ LET'S START THE JOURNEY ]`**.
+3. Camera activates in environmental rear-facing mode.
+4. Frames are analyzed every ~4 seconds (or immediately on sudden hazards).
+5. Earbuds speak short actionable instructions (e.g. *"Person ahead"*, *"Obstacle on your right"*, *"Stairs ahead. Move carefully"*, *"STOP. Vehicle approaching"*).
 
 ---
 
-## 💡 Proposed Solution & Main Novelty
-DRISHTIGUIDE AI combines computer vision with spatial and temporal risk modeling:
-- **Spatial Positioning**: Categorizes bounding box centroids into `LEFT`, `CENTER`, and `RIGHT` walking zones.
-- **Approximate Distance**: Estimates proximity (`VERY_NEAR`, `NEAR`, `MEDIUM`, `FAR`) using bounding box dimensions and vertical ground alignment.
-- **Temporal Analysis**: Tracks centroids across consecutive frames to detect object movement vectors (`STATIONARY`, `APPROACHING`, `MOVING_AWAY`, `MOVING_LATERALLY`).
-- **Dynamic Risk Engine**: Computes a dynamic 0–100 risk score mapped to `SAFE`, `CAUTION`, `HIGH`, or `CRITICAL`.
-- **Intelligent Guidance Priority Engine (Core Novelty)**: Prioritizes critical fall risks and approaching vehicles over routine background objects. Enforces speech cooldowns (4 seconds default) and suppresses duplicate repetitions while enabling emergency alerts to interrupt routine audio immediately.
+## 💻 Laptop AI Telemetry Dashboard (For Evaluators & Viva)
+The laptop dashboard provides 5 specialized technical tabs:
+1. **Overview**: Model status (`PRETRAINED MODEL` vs `CUSTOM TRAINED MODEL`), dataset size, active classes count, inference speed, confidence, current risk level, and active spoken guidance.
+2. **Dataset**: Dataset gallery filtering by class (`All`, `Person`, `Stairs`, `Door`, `Pothole`, `Vehicle`). Displays *"Dataset not configured."* if unpopulated.
+3. **Model Performance**: Displays Precision, Recall, F1, mAP@50, mAP@50-95, FPS, and parameter count from `models/metrics.json`. Displays *"Custom model evaluation not available."* if custom model is not trained.
+4. **Live Detection**: Shows live camera/webcam/upload feed with rendered bounding boxes, class, confidence %, horizontal position (`LEFT`, `CENTER`, `RIGHT`), distance (`VERY NEAR`, `NEAR`, `MEDIUM`, `FAR`), risk level, and guidance.
+5. **AI Decision ("WHY DID AI GIVE THIS INSTRUCTION?")**: Step-by-step decision audit trace (Object + Position + Distance + Movement + Risk Score $\rightarrow$ Spoken Guidance).
 
 ---
 
-## 🏗️ Hardware-Independent Prototype Architecture
-```
-Smart Glasses Camera / Mobile Camera / Laptop Webcam / Uploaded Video
-                           │
-                           ▼
-                  Smartphone Web App
-           (navigator.mediaDevices.getUserMedia)
-                           │
-               HTTP POST /api/analyze (JSON)
-                           │
-                           ▼
-                 FastAPI Backend (Render)
-      ┌────────────────────┴────────────────────┐
-      ▼                                         ▼
-Ultralytics YOLOv8                       Spatial Analyzer
-(Object Detection)                    (Position & Distance)
-      │                                         │
-      └────────────────────┬────────────────────┘
-                           ▼
-                 Temporal State Tracker
-           (Movement Vector: APPROACHING, etc.)
-                           │
-                           ▼
-                  Dynamic Risk Engine
-               (Risk Score 0-100 & Level)
-                           │
-                           ▼
-            Intelligent Priority Engine
-           (CRITICAL > IMPORTANT > INFO)
-                           │
-                           ▼
-           Short Speech Phrasing Generator
-                           │
-                           ▼
-                 Smartphone Web App
-                           │
-              Web Speech API (window.speechSynthesis)
-                           │
-                           ▼
-               Bluetooth Earphones / Earbuds
-```
+## ⚙️ Local Execution Guide
 
----
-
-## 📁 Repository Structure
-```
-drishtiguide-ai/
-├── backend/                  # Python FastAPI Backend
-│   ├── app/
-│   │   ├── config.py         # App configuration & settings
-│   │   ├── main.py           # FastAPI entrypoint & router mounts
-│   │   ├── detection/        # YOLO detector, preprocessing & temporal tracking
-│   │   ├── spatial/          # Position, distance & walking path logic
-│   │   ├── risk/             # Dynamic risk engine (0-100 scoring)
-│   │   ├── guidance/         # Intelligent priority engine & speech rules
-│   │   ├── models/           # YOLO model loader singleton
-│   │   └── routes/           # API endpoints (/detect, /analyze, /health, /metrics)
-│   ├── tests/                # Pytest unit test suite
-│   ├── requirements.txt      # Python dependencies
-│   └── Dockerfile            # Container definition
-├── frontend/                 # React (Vite + Tailwind CSS) App
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── mobile/       # Accessible Mobile View (Screen-reader ready)
-│   │   │   ├── dashboard/    # Laptop AI Research Dashboard (9 Telemetry Tabs)
-│   │   │   ├── landing/      # Project Vision Landing Page
-│   │   │   └── demo/         # Offline Demo Scenario Mode
-│   │   ├── services/         # API & Web Speech API integration
-│   │   ├── App.jsx           # Main View Switcher
-│   │   └── main.jsx
-│   └── package.json
-├── datasets/                 # YOLO Dataset YAML & Structure
-├── training/                 # Training, Validation, Predict & Export scripts
-├── docs/                     # Academic documentation & viva scripts
-├── render.yaml               # Render Cloud Deployment Spec
-└── README.md
-```
-
----
-
-## ⚙️ Installation & Setup
-
-### Prerequisites
-- Python 3.10+
-- Node.js v18+ & npm
-
-### 1. Backend Setup
+### 1. Start Python FastAPI Backend
 ```bash
 cd backend
 python -m venv venv
-# On Windows: venv\Scripts\activate
-# On Linux/Mac: source venv/bin/activate
+# On Windows: venv\Scripts\activate | On Linux/Mac: source venv/bin/activate
 pip install -r requirements.txt
-```
-
-Run backend server:
-```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-API Documentation will be available at `http://localhost:8000/docs`.
 
-### 2. Frontend Setup
+### 2. Start React Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Open `http://localhost:5173` in your browser.
+Open `http://localhost:5173` on your laptop browser.
 
 ---
 
-## 🧪 Running Unit Tests
-Backend test suite verifies spatial rules, distance estimation, risk scores, tracking, speech deduplication, emergency overrides, and API contracts:
-```bash
-cd backend
-pytest tests/test_backend.py -v
-```
+## 🎬 2-Minute College Demonstration Procedure
+
+1. **Step 1 — Mobile Journey Demo**:
+   - Open app on phone browser (or mobile view tab).
+   - Point phone camera at surroundings.
+   - Tap **`LET'S START THE JOURNEY`**.
+   - Show earphone audio delivering short guidance (*"Stairs ahead. Move carefully"*, *"Obstacle on your right"*).
+
+2. **Step 2 — Emergency Priority Override**:
+   - Point camera at approaching vehicle or trigger critical test scenario.
+   - Show audio immediately overriding routine interval: *"STOP. Vehicle approaching."*
+
+3. **Step 3 — Laptop Technical Telemetry**:
+   - Show Evaluator the **Laptop Dashboard**.
+   - Navigate through Dataset, Model Specs, Live Bounding Boxes, and the **AI Decision Explanation Panel**.
 
 ---
 
-## 🚀 Model Training & Evaluation
+## 🧠 Viva Q&A & Academic Explanation
 
-Train custom YOLO model on the 23 navigation classes:
-```bash
-python training/train.py --data datasets/dataset.yaml --epochs 100
-```
-
-Evaluate model performance (Precision, Recall, mAP@50, mAP@50-95, FPS):
-```bash
-python training/validate.py --model yolov8n.pt
-```
-
-Export model to ONNX format:
-```bash
-python training/export.py --model yolov8n.pt --format onnx
-```
+- **Problem Statement**: Visually impaired navigation suffers from severe audio overload when traditional object-detection systems announce every visible object in sight.
+- **Proposed Solution**: DrishtiGuide AI introduces **Intelligent Guidance Prioritization**, continuously answering *"What does the user need to know right now?"* to suppress audio clutter.
+- **Deep Learning Model**: YOLO (You Only Look Once) nano object detector.
+- **Spatial & Proximity Logic**: Bounding box centroid horizontal position ($x < 33\%$ LEFT, $33-66\%$ CENTER, $>66\%$ RIGHT) and height ratio proximity estimation (`VERY NEAR`, `NEAR`, `MEDIUM`, `FAR`).
+- **Dynamic Risk Engine**: 0-100 heuristic scoring mapping to `SAFE`, `CAUTION`, `HIGH`, `CRITICAL`.
 
 ---
 
-## ☁️ Render Cloud Deployment
+## ⚠️ Documented Prototype Limitations
+- **Approximate Proximity**: Distance estimation relies on 2D bounding box height ratio heuristics rather than hardware depth sensors.
+- **Lighting & Camera Dependency**: Detection accuracy is influenced by environmental lighting and phone camera clarity.
+- **Not a Certified Medical Device**: Designed strictly as an academic research prototype; not a replacement for primary mobility aids.
+
+---
+
+## ☁️ Render Deployment Instructions
+
+### Backend (Web Service):
 1. Connect repository to [Render.com](https://render.com).
-2. Create Web Service for backend using `backend/Dockerfile` or `render.yaml`.
-3. Deploy frontend static build (`npm run build`) to Vercel/Render with `VITE_API_URL=https://your-backend.onrender.com`.
+2. Set Build Command: `pip install -r backend/requirements.txt`.
+3. Set Start Command: `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+4. Set Env Vars: `MODEL_PATH=yolov8n.pt`, `CONFIDENCE_THRESHOLD=0.45`.
 
----
-
-## 🔒 Privacy & Safety Notice
-> **Privacy Notice**: Camera frames are processed strictly in-memory for real-time inference and are not permanently stored by default. Facial recognition is not performed.  
-> **Academic Disclaimer**: DRISHTIGUIDE AI is an academic research prototype and is not a certified medical, safety, or primary navigation device.
-
----
-
-## 👥 Authors & Academic Contribution
-Developed as an advanced agentic computer vision project for assistive technology.
+### Frontend (Static Site / Vercel):
+1. Set Env Var: `VITE_API_URL=https://your-backend.onrender.com`.
+2. Set Build Command: `npm run build` (Root directory `frontend`, Output directory `dist`).

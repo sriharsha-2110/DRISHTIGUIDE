@@ -14,6 +14,26 @@ class Detector:
     temporal tracking, risk scoring, and priority guidance mapping.
     """
 
+    # Target navigational classes mapping from COCO standard or fine-tuned custom classes
+    CLASS_MAP = {
+        "person": "person",
+        "car": "car",
+        "bus": "car",
+        "truck": "car",
+        "motorbike": "motorcycle",
+        "motorcycle": "motorcycle",
+        "bicycle": "bicycle",
+        "chair": "chair",
+        "couch": "chair",
+        "sofa": "chair",
+        "traffic light": "traffic_light",
+        "traffic_light": "traffic_light",
+        "pole": "pole",
+        "door": "door",
+        "stairs": "stairs",
+        "pothole": "pothole"
+    }
+
     def __init__(self):
         self.loader = ModelLoader.get_instance()
 
@@ -38,24 +58,27 @@ class Detector:
                     xyxy = box.xyxy[0].cpu().numpy().tolist()
                     conf = float(box.conf[0].cpu().numpy())
                     cls_id = int(box.cls[0].cpu().numpy())
-                    cls_name = result.names.get(cls_id, f"object_{cls_id}")
+                    raw_cls_name = result.names.get(cls_id, f"object_{cls_id}").lower()
+                    
+                    # Map to primary navigation class if mapped, or keep raw name
+                    cls_name = self.CLASS_MAP.get(raw_cls_name, raw_cls_name)
 
                     x1, y1, x2, y2 = xyxy
                     bbox_tuple = (x1, y1, x2, y2)
 
-                    # 1. Horizontal Position
+                    # 1. Horizontal Position (LEFT, CENTER, RIGHT)
                     position = SpatialAnalyzer.get_horizontal_position(bbox_tuple, img_w)
 
-                    # 2. Approximate Distance Estimation
+                    # 2. Approximate Distance Estimation (VERY_NEAR, NEAR, MEDIUM, FAR)
                     distance = SpatialAnalyzer.estimate_approximate_distance(bbox_tuple, img_w, img_h)
 
                     # 3. Walking Path Alignment
                     walking_path = SpatialAnalyzer.get_walking_path_zone(bbox_tuple, img_w)
 
-                    # 4. Temporal Movement Analysis
+                    # 4. Temporal Movement Analysis (STATIONARY, APPROACHING, MOVING_AWAY, etc.)
                     movement = global_tracker.update_and_analyze(cls_name, bbox_tuple)
 
-                    # 5. Dynamic Risk Scoring (0-100) & Risk Level
+                    # 5. Dynamic Risk Engine Scoring (0-100) & Risk Level
                     risk_score, risk_level = RiskEngine.calculate_risk(
                         class_name=cls_name,
                         confidence=conf,
@@ -87,14 +110,13 @@ class Detector:
                         "priority": priority
                     })
         else:
-            # Mock fallback for test environments or initial load
+            # Fallback mock simulation if model weights fail to load on host
             detections = self._generate_fallback_detections(img_w, img_h)
 
         elapsed_ms = round((time.time() - start_time) * 1000, 2)
         return detections, elapsed_ms
 
     def _generate_fallback_detections(self, img_w: int, img_h: int) -> List[Dict[str, Any]]:
-        # Fallback simulation if model weights fail to load on host
         mock_bbox = [int(img_w * 0.35), int(img_h * 0.30), int(img_w * 0.65), int(img_h * 0.85)]
         pos = SpatialAnalyzer.get_horizontal_position(tuple(mock_bbox), img_w)
         dist = SpatialAnalyzer.estimate_approximate_distance(tuple(mock_bbox), img_w, img_h)

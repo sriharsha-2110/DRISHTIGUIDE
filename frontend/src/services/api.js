@@ -26,7 +26,17 @@ export async function getMetrics() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
-    return { status: 'error', error: err.message };
+    return { evaluation_available: false, error: err.message };
+  }
+}
+
+export async function getDatasetInfo() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/dataset`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    return { configured: false, message: 'Dataset not configured.', total_images: 0, samples: [] };
   }
 }
 

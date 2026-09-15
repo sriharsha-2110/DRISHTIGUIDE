@@ -12,8 +12,9 @@ async def analyze_frame(
 ):
     """
     POST /api/analyze
-    Runs full Deep Learning pipeline: detection, spatial positioning, approximate distance,
-    temporal tracking, walking path alignment, dynamic risk scoring, priority sorting, and voice guidance generation.
+    Receives an image payload, executes YOLO object detection, spatial position classification,
+    approximate distance estimation, temporal movement analysis, dynamic risk scoring,
+    and priority guidance generation.
     """
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(
@@ -33,19 +34,20 @@ async def analyze_frame(
 
     top_movement = "STATIONARY"
     if detections:
-        # Get movement of top prioritized risk item
         top_item = max(detections, key=lambda d: d.get("risk_score", 0))
         top_movement = top_item.get("movement", "STATIONARY")
+
+    instruction_text = guidance_result.get("instruction") or ""
 
     return {
         "detections": detections,
         "risk_score": guidance_result.get("risk_score", 0),
         "risk_level": guidance_result.get("risk_level", "SAFE"),
-        "priority": guidance_result.get("priority", "IGNORE"),
-        "movement": top_movement,
-        "instruction": guidance_result.get("instruction"),
+        "instruction": instruction_text,
+        "priority": guidance_result.get("priority", "NONE"),
         "critical": guidance_result.get("critical", False),
         "suppressed": guidance_result.get("suppressed", False),
-        "reason": guidance_result.get("reason"),
+        "reason": guidance_result.get("reason", ""),
+        "movement": top_movement,
         "processing_time_ms": processing_time_ms
     }

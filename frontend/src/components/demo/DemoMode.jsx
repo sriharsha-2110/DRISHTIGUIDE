@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Volume2, ShieldAlert, AlertOctagon, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Play, Volume2, AlertOctagon } from 'lucide-react';
 import { speechService } from '../../services/speechService';
 
 export default function DemoMode() {
@@ -8,7 +8,7 @@ export default function DemoMode() {
   const demoScenarios = [
     {
       id: 1,
-      title: "Scenario 1: Person Ahead",
+      title: "PERSON AHEAD",
       object: "person",
       confidence: 0.94,
       position: "CENTER",
@@ -22,21 +22,7 @@ export default function DemoMode() {
     },
     {
       id: 2,
-      title: "Scenario 2: Chair on Right",
-      object: "chair",
-      confidence: 0.88,
-      position: "RIGHT",
-      distance: "MEDIUM",
-      movement: "STATIONARY",
-      riskScore: 28,
-      riskLevel: "CAUTION",
-      priority: "INFORMATION",
-      instruction: "Obstacle on your right.",
-      reason: "Furniture obstacle detected on right side at medium distance."
-    },
-    {
-      id: 3,
-      title: "Scenario 3: Stairs Ahead",
+      title: "STAIRS AHEAD",
       object: "stairs",
       confidence: 0.96,
       position: "CENTER",
@@ -49,8 +35,22 @@ export default function DemoMode() {
       reason: "Fall hazard (stairs) detected directly in walking path."
     },
     {
+      id: 3,
+      title: "OBSTACLE RIGHT",
+      object: "chair",
+      confidence: 0.88,
+      position: "RIGHT",
+      distance: "MEDIUM",
+      movement: "STATIONARY",
+      riskScore: 28,
+      riskLevel: "CAUTION",
+      priority: "INFORMATION",
+      instruction: "Obstacle on your right.",
+      reason: "Furniture obstacle detected on right side at medium distance."
+    },
+    {
       id: 4,
-      title: "Scenario 4: Vehicle Approaching (Critical)",
+      title: "VEHICLE APPROACHING",
       object: "car",
       confidence: 0.92,
       position: "CENTER",
@@ -64,7 +64,7 @@ export default function DemoMode() {
     },
     {
       id: 5,
-      title: "Scenario 5: Pothole Ahead",
+      title: "POTHOLE AHEAD",
       object: "pothole",
       confidence: 0.90,
       position: "CENTER",
@@ -75,20 +75,6 @@ export default function DemoMode() {
       priority: "IMPORTANT",
       instruction: "Pothole ahead. Step carefully.",
       reason: "Ground tripping hazard detected near center walking path."
-    },
-    {
-      id: 6,
-      title: "Scenario 6: Multiple Objects (Priority Filter Test)",
-      object: "car",
-      confidence: 0.95,
-      position: "CENTER",
-      distance: "NEAR",
-      movement: "APPROACHING",
-      riskScore: 92,
-      riskLevel: "CRITICAL",
-      priority: "CRITICAL",
-      instruction: "STOP. Vehicle approaching.",
-      reason: "Multiple objects present (Chair, Person, Vehicle). Guidance engine prioritized critical vehicle hazard over routine obstacles."
     }
   ];
 
@@ -99,14 +85,19 @@ export default function DemoMode() {
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-      <div>
-        <h2 className="text-xl font-black text-cyan-400 uppercase tracking-wider flex items-center space-x-2">
-          <Play className="w-5 h-5 text-cyan-400" />
-          <span>OFFLINE DEMONSTRATION MODE</span>
-        </h2>
-        <p className="text-xs text-slate-400 mt-1">
-          Guarantees flawless presentation even without hardware camera streams or active cloud backend connections.
-        </p>
+      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h2 className="text-xl font-black text-cyan-400 uppercase tracking-wider flex items-center space-x-2">
+            <Play className="w-5 h-5 text-cyan-400" />
+            <span>OFFLINE DEMONSTRATION MODE</span>
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Pre-configured scenario simulations guaranteeing a reliable demonstration even without active cameras or internet connections.
+          </p>
+        </div>
+        <span className="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-xs font-bold px-3 py-1 rounded-lg">
+          DEMO MODE
+        </span>
       </div>
 
       {/* Scenario Buttons Grid */}
@@ -132,10 +123,10 @@ export default function DemoMode() {
 
       {/* Active Scenario Detailed Breakdown */}
       {selectedScenario && (
-        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4 animate-fadeIn">
+        <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
-              Simulation Results: {selectedScenario.title}
+              Scenario Execution: {selectedScenario.title}
             </h3>
             <button
               onClick={() => speechService.speak(selectedScenario.instruction, true)}
@@ -170,7 +161,6 @@ export default function DemoMode() {
             </div>
           </div>
 
-          {/* Spoken Output Banner */}
           <div className="bg-slate-900 border-2 border-cyan-500/40 p-4 rounded-xl flex items-center justify-between">
             <div>
               <span className="text-[10px] text-cyan-400 font-extrabold uppercase tracking-widest block">Generated Spoken Instruction</span>
@@ -178,9 +168,8 @@ export default function DemoMode() {
             </div>
           </div>
 
-          {/* AI Decision Reason */}
           <div className="text-xs text-slate-400 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-            <strong className="text-slate-200 uppercase font-bold block mb-1">AI Guidance Engine Explanation:</strong>
+            <strong className="text-slate-200 uppercase font-bold block mb-1">AI Decision Explanation:</strong>
             {selectedScenario.reason}
           </div>
         </div>

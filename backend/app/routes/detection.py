@@ -8,8 +8,8 @@ router = APIRouter(prefix="/api", tags=["Detection"])
 async def detect_objects(file: UploadFile = File(...)):
     """
     POST /api/detect
-    Receives an image file via multipart/form-data, decodes it,
-    runs YOLO object detection, and returns detections with horizontal position & distance.
+    Receives an image file, executes YOLO detection, and returns detections
+    enriched with 20-object class mapping, emoji, and multilingual translations.
     """
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(
@@ -21,19 +21,8 @@ async def detect_objects(file: UploadFile = File(...)):
     img_bgr = validate_and_decode_image(image_bytes)
     
     detections, processing_time_ms = detector_service.detect(img_bgr)
-    
-    # Strip extra research fields for basic detect schema compliance
-    clean_detections = []
-    for d in detections:
-        clean_detections.append({
-            "class": d["class"],
-            "confidence": d["confidence"],
-            "bbox": d["bbox"],
-            "position": d["position"],
-            "distance": d["distance"]
-        })
 
     return {
-        "detections": clean_detections,
+        "detections": detections,
         "processing_time_ms": processing_time_ms
     }

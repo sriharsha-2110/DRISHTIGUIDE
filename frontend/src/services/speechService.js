@@ -4,39 +4,56 @@ class SpeechService {
     this.isMuted = false;
     this.lastSpokenText = '';
     this.speechRate = 1.0;
-    this.speechPitch = 1.0;
+    this.speechVolume = 1.0;
+    this.vibrationEnabled = true;
+    this.currentLangCode = 'en-US';
   }
 
-  speak(text, isCritical = false) {
+  setSettings({ rate, volume, vibration, langCode }) {
+    if (rate !== undefined) this.speechRate = rate;
+    if (volume !== undefined) this.speechVolume = volume;
+    if (vibration !== undefined) this.vibrationEnabled = vibration;
+    if (langCode !== undefined) this.currentLangCode = langCode;
+  }
+
+  triggerVibration(pattern = [80]) {
+    if (this.vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(pattern);
+      } catch (e) {
+        // Ignored if unsupported on desktop
+      }
+    }
+  }
+
+  speak(text, langCode = null, isCritical = false) {
     if (!text || this.isMuted || !this.synth) return;
 
     this.lastSpokenText = text;
+    const targetLang = langCode || this.currentLangCode;
 
-    // If critical alert, cancel ongoing speech immediately!
     if (isCritical && this.synth.speaking) {
       this.synth.cancel();
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = isCritical ? 1.15 : this.speechRate;
-    utterance.pitch = isCritical ? 1.1 : this.speechPitch;
+    utterance.volume = this.speechVolume;
+    utterance.lang = targetLang;
 
-    // Try selecting clear English voice if available
+    // Try selecting best matching voice for target language
     const voices = this.synth.getVoices();
-    const preferredVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Natural')) ||
-                           voices.find(v => v.lang.startsWith('en'));
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
+    const matchingVoice = voices.find(v => v.lang === targetLang || v.lang.startsWith(targetLang.split('-')[0]));
+    if (matchingVoice) {
+      utterance.voice = matchingVoice;
     }
 
     this.synth.speak(utterance);
   }
 
-  repeatLast() {
+  repeatLast(langCode = null) {
     if (this.lastSpokenText) {
-      this.speak(this.lastSpokenText, true);
-    } else {
-      this.speak("No recent guidance to repeat.");
+      this.speak(this.lastSpokenText, langCode, true);
     }
   }
 

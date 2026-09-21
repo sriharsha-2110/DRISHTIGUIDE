@@ -1,34 +1,80 @@
-# DRISHTIGUIDE AI
-> **"Let AI Be Your Eyes."**  
-> *DrishtiGuide AI: A Deep Learning-Based Visual Assistance System for Visually Impaired People*
+# DRISHTI AI
+> **"Multilingual AI-Powered Assistive Vision System for Visually Impaired Users"**
 
 ---
 
 ## 👁️ Project Overview
-**DrishtiGuide AI** is a Deep Learning-based visual assistance prototype designed to help visually impaired users interpret their surroundings through short, context-aware voice instructions. A smartphone camera acts as the prototype equivalent of a camera integrated into smart glasses, while Bluetooth earbuds provide the audio output. The system uses YOLO-based object detection, spatial positioning, approximate proximity estimation and priority-based risk analysis to determine which environmental information should be communicated to the user. A separate laptop dashboard provides dataset visualization, model evaluation metrics, live detection and AI decision explanations.
+**Drishti AI** is a multilingual computer-vision assistance system designed to empower visually impaired users to recognize everyday objects and navigation landmarks in their environment.
+
+A smartphone camera captures visual frames, while a lightweight YOLO deep learning model detects objects. Upon pressing a prominent, high-contrast **`DETECT OBJECT 🔍`** button, the system translates the identified object into 1 of 5 supported Indian languages (**English 🇬🇧, Kannada 🇮🇳, Telugu 🇮🇳, Tamil 🇮🇳, Malayalam 🇮🇳**) and speaks the translated name aloud via Text-to-Speech (TTS) to connected Bluetooth earbuds.
 
 ---
 
-## 📱 Mobile Assistance Workflow
-1. User connects Bluetooth earbuds to smartphone.
-2. User opens the application on mobile browser and taps **`[ LET'S START THE JOURNEY ]`**.
-3. Camera activates in environmental rear-facing mode.
-4. Frames are analyzed every ~4 seconds (or immediately on sudden hazards).
-5. Earbuds speak short actionable instructions (e.g. *"Person ahead"*, *"Obstacle on your right"*, *"Stairs ahead. Move carefully"*, *"STOP. Vehicle approaching"*).
+## 📦 20 Target Everyday & Navigation Objects
+
+| ID | Object Name | Emoji | Example Use Case |
+|---|---|---|---|
+| 0 | Bottle | 🍾 | Hydration / Tableware |
+| 1 | Cup | ☕ | Beverage / Kitchen |
+| 2 | Mobile Phone | 📱 | Personal Device |
+| 3 | Book | 📖 | Reading / Study |
+| 4 | Chair | 🪑 | Furniture / Seating |
+| 5 | Laptop | 💻 | Work / Electronics |
+| 6 | Pen | 🖊️ | Writing Instrument |
+| 7 | Keys | 🔑 | Personal Belongings |
+| 8 | Backpack | 🎒 | Storage / Travel |
+| 9 | Water Glass | 🥛 | Tableware |
+| 10 | Plate | 🍽️ | Tableware |
+| 11 | Spoon | 🥄 | Tableware |
+| 12 | Shoes | 👟 | Wearable / Footwear |
+| 13 | Clock | ⏰ | Time keeping |
+| 14 | Remote | 📺 | Electronics |
+| 15 | Keyboard | ⌨️ | Electronics |
+| 16 | Mouse | 🖱️ | Electronics |
+| 17 | Sunglasses | 🕶️ | Wearable |
+| 18 | Umbrella | ☂️ | Travel / Weather |
+| 19 | Helmet | 🪖 | Safety Gear |
 
 ---
 
-## 💻 Laptop AI Telemetry Dashboard (For Evaluators & Viva)
-The laptop dashboard provides 5 specialized technical tabs:
-1. **Overview**: Model status (`PRETRAINED MODEL` vs `CUSTOM TRAINED MODEL`), dataset size, active classes count, inference speed, confidence, current risk level, and active spoken guidance.
-2. **Dataset**: Dataset gallery filtering by class (`All`, `Person`, `Stairs`, `Door`, `Pothole`, `Vehicle`). Displays *"Dataset not configured."* if unpopulated.
-3. **Model Performance**: Displays Precision, Recall, F1, mAP@50, mAP@50-95, FPS, and parameter count from `models/metrics.json`. Displays *"Custom model evaluation not available."* if custom model is not trained.
-4. **Live Detection**: Shows live camera/webcam/upload feed with rendered bounding boxes, class, confidence %, horizontal position (`LEFT`, `CENTER`, `RIGHT`), distance (`VERY NEAR`, `NEAR`, `MEDIUM`, `FAR`), risk level, and guidance.
-5. **AI Decision ("WHY DID AI GIVE THIS INSTRUCTION?")**: Step-by-step decision audit trace (Object + Position + Distance + Movement + Risk Score $\rightarrow$ Spoken Guidance).
+## 🌐 5-Language Multilingual Dictionary Matrix
+
+| Object | English 🇬🇧 | Kannada 🇮🇳 (ಕನ್ನಡ) | Telugu 🇮🇳 (తెలుగు) | Tamil 🇮🇳 (தமிழ்) | Malayalam 🇮🇳 (മലയാളം) |
+|---|---|---|---|---|---|
+| **Bottle** | Bottle | ಬಾಟಲಿ | బాటిల్ | பாட்டில் | കുപ്പി |
+| **Cup** | Cup | ಕಪ್ | కప్ | கப் | കപ്പ് |
+| **Mobile Phone** | Mobile Phone | ಮೊಬೈಲ್ ಫೋನ್ | మొబైల్ ఫోన్ | மொபைல் போன் | മൊബൈൽ |
+| **Book** | Book | ಪುಸ್ತಕ | పుస్తకం | புத்தகம் | പുസ്തകം |
+| **Chair** | Chair | ಕುರ್ಚಿ | కుర్చీ | நாற்காலி | കസേര |
+| **Laptop** | Laptop | ಲ್ಯಾಪ್‌ಟಾಪ್ | ల్యాప్‌టాప్ | லேப்டாப் | ലാപ്‌ടോപ്പ് |
+| **Pen** | Pen | ಪೆನ್ | పెన్ | பேனா | പേന |
+| **Keys** | Keys | ಕೀಲಿಗಳು | తాళంచెవులు | சாவி | താക്കോലുകൾ |
+| **Backpack** | Backpack | ಬ್ಯಾಕ್‌ಪ್ಯಾಕ್ | బ్యాక్‌ప్యాక్ | பயணப் பை | ബാഗ് |
+| **Water Glass** | Water Glass | ನೀರಿನ ಲೋಟ | గ్లాస్ | தண்ணீர் டம்ளர் | ഗ്ലാസ് |
+| **Plate** | Plate | ತಟ್ಟೆ | ప్లేట్ | தட்டு | പ്ലേറ്റ് |
+| **Spoon** | Spoon | ಚಮಚ | స్పూన్ | கரண்டி | സ്പൂൺ |
+| **Shoes** | Shoes | ಶೂಗಳು | షూస్ | காலணிகள் | ഷൂസ് |
+| **Clock** | Clock | ಗಡಿಯಾರ | గడియారం | கடிகாரம் | ക്ലോക്ക് |
+| **Remote** | Remote | ರಿಮೋಟ್ | రిమోట్ | ரிமோட் | റിമോട്ട് |
+| **Keyboard** | Keyboard | ಕೀಬೋರ್ಡ್ | కీబోర్డ్ | விசைப்பலகை | കീബോർഡ് |
+| **Mouse** | Mouse | ಮೌಸ್ | మౌస్ | மவுஸ் | മൗസ് |
+| **Sunglasses** | Sunglasses | ಸನ್ಗ್ಲಾಸ್ | సన్‌గ్లాసెస్ | சூரியக் கண்ணாடி | സൺഗ്ലാസ് |
+| **Umbrella** | Umbrella | ಛತ್ರಿ | గొడుగు | குடை | കുട |
+| **Helmet** | Helmet | ಹೆಲ್ಮೆಟ್ | హెల్మెట్ | ஹெல்மெட் | ഹെൽമെറ്റ് |
 
 ---
 
-## ⚙️ Local Execution Guide
+## 📱 Mobile-First Accessible UI Sections
+
+1. 🏠 **Home**: Live Camera Viewport + **HUGE DETECT OBJECT 🔍** button (~40-50% height) + Last Detection Card showing Emoji, Translated Name, Confidence %, Position, and `🔊 Speak Result`.
+2. 🌐 **Language Selector**: English 🇬🇧, Kannada 🇮🇳, Telugu 🇮🇳, Tamil 🇮🇳, Malayalam 🇮🇳.
+3. 📊 **Detection History**: Log table of past detections with timestamps, emojis, confidence %, and language spoken.
+4. ⚙️ **Settings**: Voice speed slider (0.5x – 1.5x), voice volume slider, vibration toggle, auto-speak toggle.
+5. 🧪 **Demo Mode**: Offline scenario buttons (Bottle, Cup, Mobile, Book, Chair, Laptop, Stairs, Vehicle) for college evaluation.
+
+---
+
+## ⚙️ How to Run Locally
 
 ### 1. Start Python FastAPI Backend
 ```bash
@@ -45,53 +91,21 @@ cd frontend
 npm install
 npm run dev
 ```
-Open `http://localhost:5173` on your laptop browser.
+Open **[http://localhost:5173](http://localhost:5173)** on your laptop browser.
 
 ---
 
-## 🎬 2-Minute College Demonstration Procedure
+## ☁️ How to Deploy on Render
 
-1. **Step 1 — Mobile Journey Demo**:
-   - Open app on phone browser (or mobile view tab).
-   - Point phone camera at surroundings.
-   - Tap **`LET'S START THE JOURNEY`**.
-   - Show earphone audio delivering short guidance (*"Stairs ahead. Move carefully"*, *"Obstacle on your right"*).
+### Backend Deployment (Render Web Service)
+1. Sign up / Log into [Render.com](https://render.com).
+2. Create **New Web Service** and link your GitHub repository.
+3. Build Command: `pip install -r backend/requirements.txt`
+4. Start Command: `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+5. Render URL: `https://drishtiguide-backend.onrender.com`
 
-2. **Step 2 — Emergency Priority Override**:
-   - Point camera at approaching vehicle or trigger critical test scenario.
-   - Show audio immediately overriding routine interval: *"STOP. Vehicle approaching."*
-
-3. **Step 3 — Laptop Technical Telemetry**:
-   - Show Evaluator the **Laptop Dashboard**.
-   - Navigate through Dataset, Model Specs, Live Bounding Boxes, and the **AI Decision Explanation Panel**.
-
----
-
-## 🧠 Viva Q&A & Academic Explanation
-
-- **Problem Statement**: Visually impaired navigation suffers from severe audio overload when traditional object-detection systems announce every visible object in sight.
-- **Proposed Solution**: DrishtiGuide AI introduces **Intelligent Guidance Prioritization**, continuously answering *"What does the user need to know right now?"* to suppress audio clutter.
-- **Deep Learning Model**: YOLO (You Only Look Once) nano object detector.
-- **Spatial & Proximity Logic**: Bounding box centroid horizontal position ($x < 33\%$ LEFT, $33-66\%$ CENTER, $>66\%$ RIGHT) and height ratio proximity estimation (`VERY NEAR`, `NEAR`, `MEDIUM`, `FAR`).
-- **Dynamic Risk Engine**: 0-100 heuristic scoring mapping to `SAFE`, `CAUTION`, `HIGH`, `CRITICAL`.
-
----
-
-## ⚠️ Documented Prototype Limitations
-- **Approximate Proximity**: Distance estimation relies on 2D bounding box height ratio heuristics rather than hardware depth sensors.
-- **Lighting & Camera Dependency**: Detection accuracy is influenced by environmental lighting and phone camera clarity.
-- **Not a Certified Medical Device**: Designed strictly as an academic research prototype; not a replacement for primary mobility aids.
-
----
-
-## ☁️ Render Deployment Instructions
-
-### Backend (Web Service):
-1. Connect repository to [Render.com](https://render.com).
-2. Set Build Command: `pip install -r backend/requirements.txt`.
-3. Set Start Command: `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
-4. Set Env Vars: `MODEL_PATH=yolov8n.pt`, `CONFIDENCE_THRESHOLD=0.45`.
-
-### Frontend (Static Site / Vercel):
-1. Set Env Var: `VITE_API_URL=https://your-backend.onrender.com`.
-2. Set Build Command: `npm run build` (Root directory `frontend`, Output directory `dist`).
+### Frontend Deployment (Vercel / Netlify / Render Static Site)
+1. Environment Variable: `VITE_API_URL` = `https://drishtiguide-backend.onrender.com`
+2. Root Directory: `frontend`
+3. Build Command: `npm run build`
+4. Output Directory: `dist`

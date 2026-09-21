@@ -1,4 +1,21 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const getApiBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    let url = import.meta.env.VITE_API_URL;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `https://${url}`;
+    }
+    return url;
+  }
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host !== 'localhost' && host !== '127.0.0.1') {
+      return 'https://drishti-ai-backend.onrender.com';
+    }
+  }
+  return 'http://localhost:8000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export async function checkHealth() {
   try {
@@ -45,14 +62,14 @@ export async function analyzeImageBlob(imageBlob, force = false) {
   formData.append('file', imageBlob, 'frame.jpg');
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/analyze?force=${force}`, {
+    const res = await fetch(`${API_BASE_URL}/api/detect`, {
       method: 'POST',
       body: formData,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.warn('API connection failed, falling back to local client processing', err);
+    console.warn('API connection failed:', err);
     return null;
   }
 }

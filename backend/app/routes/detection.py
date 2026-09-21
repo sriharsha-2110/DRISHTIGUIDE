@@ -5,9 +5,10 @@ from app.detection.detector import detector_service
 router = APIRouter(prefix="/api", tags=["Detection"])
 
 @router.post("/detect")
+@router.post("/analyze")
 async def detect_objects(file: UploadFile = File(...)):
     """
-    POST /api/detect
+    POST /api/detect & POST /api/analyze
     Receives an actual camera image frame, executes real YOLO inference,
     and returns detected classes, confidence floats, and bounding box coordinates.
     Returns 'No object detected. Please adjust the camera.' when detections list is empty.

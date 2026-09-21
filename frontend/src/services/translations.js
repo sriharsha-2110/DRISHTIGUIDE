@@ -6,7 +6,7 @@ export const OBJECT_TRANSLATIONS = {
     emoji: "🍾",
     en: "Bottle",
     kn: "ಬಾಟಲಿ",
-    te: "బాటిల్",
+    te: "సీసా",
     ta: "பாட்டில்",
     ml: "കുപ്പി"
   },
@@ -17,6 +17,14 @@ export const OBJECT_TRANSLATIONS = {
     te: "కప్",
     ta: "கப்",
     ml: "കപ്പ്"
+  },
+  mobile_phone: {
+    emoji: "📱",
+    en: "Mobile Phone",
+    kn: "ಮೊಬೈಲ್ ಫೋನ್",
+    te: "మొబైల్ ఫోన్",
+    ta: "மொபைல் போன்",
+    ml: "ಮೊಬೈಲ್"
   },
   mobile: {
     emoji: "📱",
@@ -74,6 +82,14 @@ export const OBJECT_TRANSLATIONS = {
     ta: "பயணப் பை",
     ml: "ബാഗ്"
   },
+  water_glass: {
+    emoji: "🥛",
+    en: "Water Glass",
+    kn: "ನೀರಿನ ಲೋಟ",
+    te: "గ్లాస్",
+    ta: "தண்ணீர் டம்ளர்",
+    ml: "ഗ്ലാസ്"
+  },
   glass: {
     emoji: "🥛",
     en: "Water Glass",
@@ -86,7 +102,7 @@ export const OBJECT_TRANSLATIONS = {
     emoji: "🍽️",
     en: "Plate",
     kn: "ತಟ್ಟೆ",
-    te: "ప్ಲೇಟ್",
+    te: "ప్లేట్",
     ta: "தட்டு",
     ml: "പ്ലേറ്റ്"
   },
@@ -136,13 +152,13 @@ export const OBJECT_TRANSLATIONS = {
     kn: "ಮೌಸ್",
     te: "మౌస్",
     ta: "மவுஸ்",
-    ml: "മൗസ്"
+    ml: "മೌಸ್"
   },
   sunglasses: {
     emoji: "🕶️",
     en: "Sunglasses",
     kn: "ಸನ್ಗ್ಲಾಸ್",
-    te: "సన్‌గ్లాసెస్",
+    te: "సన్‌గ్ಲಾసెస్",
     ta: "சூரியக் கண்ணாடி",
     ml: "സൺഗ്ലാസ്"
   },
@@ -159,49 +175,17 @@ export const OBJECT_TRANSLATIONS = {
     en: "Helmet",
     kn: "ಹೆಲ್ಮೆಟ್",
     te: "హెಲ್ಮೆಟ್",
-    ta: "ஹெல்மெட்",
-    ml: "ஹെൽമെറ്റ്"
-  },
-  person: {
-    emoji: "👤",
-    en: "Person",
-    kn: "ವ್ಯಕ್ತಿ",
-    te: "వ్యక్తి",
-    ta: "நபர்",
-    ml: "ആൾ"
-  },
-  car: {
-    emoji: "🚗",
-    en: "Car",
-    kn: "ಕಾರು",
-    te: "కారు",
-    ta: "கார்",
-    ml: "കാർ"
-  },
-  stairs: {
-    emoji: "🪜",
-    en: "Stairs",
-    kn: "ಮೆಟ್ಟಿಲುಗಳು",
-    te: "మెట్లు",
-    ta: "படிகள்",
-    ml: "പടികൾ"
-  },
-  door: {
-    emoji: "🚪",
-    en: "Door",
-    kn: "ಬಾಗಿಲು",
-    te: "తలుపు",
-    ta: "கதவு",
-    ml: "വാതിൽ"
-  },
-  pothole: {
-    emoji: "🕳️",
-    en: "Pothole",
-    kn: "ಗುಂಡಿ",
-    te: "గొయ్యి",
-    ta: "பள்ளம்",
-    ml: "കുഴി"
+    ta: "ஹெಲ್ಮೆಟ್",
+    ml: "ഹെൽಮೆಟ್"
   }
+};
+
+export const NO_OBJECT_TRANSLATIONS = {
+  en: "No object detected. Please adjust the camera.",
+  kn: "ಯಾವುದೇ ವಸ್ತು ಪತ್ತೆಯಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ಕ್ಯಾಮೆರಾವನ್ನು ಸರಿಹೊಂದಿಸಿ.",
+  te: "ఏ వస్తువు గుర్తించబడలేదు. దయచేసి కెమెరాను సర్దుబాటు చేయండి.",
+  ta: "எந்த பொருளும் கண்டறியப்படவில்லை. கேமராவை சரிசெய்யவும்.",
+  ml: "വസ്തുവൊന്നും കണ്ടെത്തിയില്ല. ക്യാമറ ക്രമീകരിക്കുക."
 };
 
 export const LANGUAGES = [
@@ -213,14 +197,15 @@ export const LANGUAGES = [
 ];
 
 export function getObjectTranslation(objectClass, langId = 'en') {
+  if (!objectClass) return { emoji: "🔍", translatedName: "Object", englishName: "Object" };
   const normalizedKey = objectClass.toLowerCase().replace(/\s+/g, '_');
   const entry = OBJECT_TRANSLATIONS[normalizedKey] || OBJECT_TRANSLATIONS[objectClass.toLowerCase()] || {
     emoji: "🔍",
-    en: objectClass,
-    kn: objectClass,
-    te: objectClass,
-    ta: objectClass,
-    ml: objectClass
+    en: objectClass.replace("_", " ").capitalize(),
+    kn: objectClass.replace("_", " ").capitalize(),
+    te: objectClass.replace("_", " ").capitalize(),
+    ta: objectClass.replace("_", " ").capitalize(),
+    ml: objectClass.replace("_", " ").capitalize()
   };
 
   return {

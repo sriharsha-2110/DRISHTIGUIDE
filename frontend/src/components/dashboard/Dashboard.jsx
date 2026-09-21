@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { checkHealth, getModelInfo, analyzeImageBlob } from '../../services/api';
 import { speechService } from '../../services/speechService';
-import { LANGUAGES, getObjectTranslation } from '../../services/translations';
+import { LANGUAGES, getObjectTranslation, NO_OBJECT_TRANSLATIONS } from '../../services/translations';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('home'); // 'home', 'language', 'history', 'settings', 'demo'
@@ -129,22 +129,19 @@ export default function Dashboard() {
       canvas.toBlob(async (blob) => {
         if (blob) {
           const res = await analyzeImageBlob(blob, true);
-          if (res) handleDetectionResponse(res, canvas, ctx);
-          else simulateFallbackDetection();
+          handleDetectionResponse(res, canvas, ctx);
         } else {
-          simulateFallbackDetection();
+          handleNoDetectionResponse();
         }
         setIsDetecting(false);
       }, 'image/jpeg', 0.85);
     } else {
-      setTimeout(() => {
-        simulateFallbackDetection();
-        setIsDetecting(false);
-      }, 600);
+      handleNoDetectionResponse();
+      setIsDetecting(false);
     }
   };
 
-  // Handle uploaded image
+  // Handle uploaded image file
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -158,63 +155,72 @@ export default function Dashboard() {
       ctx.drawImage(img, 0, 0);
 
       canvas.toBlob(async (blob) => {
-        const res = await analyzeImageBlob(blob, true);
-        if (res) handleDetectionResponse(res, canvas, ctx);
-        else simulateFallbackDetection();
+        if (blob) {
+          const res = await analyzeImageBlob(blob, true);
+          handleDetectionResponse(res, canvas, ctx);
+        } else {
+          handleNoDetectionResponse();
+        }
       }, 'image/jpeg', 0.9);
     };
     img.src = URL.createObjectURL(file);
   };
 
   const handleDetectionResponse = (res, canvas, ctx) => {
-    setCurrentFrameResults(res);
-    drawBoundingBoxes(ctx, res.detections || [], canvas.width, canvas.height);
+    if (!res || !res.detections || res.detections.length === 0) {
+      handleNoDetectionResponse();
+      return;
+    }
 
-    const primaryDetection = res.detections?.[0];
+    setCurrentFrameResults(res);
+    drawBoundingBoxes(ctx, res.detections, canvas.width, canvas.height);
+
+    const primaryDetection = res.detections[0];
     if (primaryDetection) {
       announceDetection(primaryDetection);
     }
   };
 
-  const fallbackClasses = ["mobile", "cup", "book", "chair", "laptop", "pen", "keys", "backpack", "glass", "plate", "bottle"];
-  const fallbackIndexRef = useRef(0);
+  const handleNoDetectionResponse = () => {
+    const noObjMessage = NO_OBJECT_TRANSLATIONS[selectedLang] || NO_OBJECT_TRANSLATIONS.en;
+    const currentLangObj = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
 
-  const simulateFallbackDetection = () => {
-    const targetClass = fallbackClasses[fallbackIndexRef.current % fallbackClasses.length];
-    fallbackIndexRef.current += 1;
-
-    const fallbackDet = {
-      class: targetClass,
-      confidence: 0.92,
-      position: "CENTER",
-      distance: "NEAR",
-      bbox: [200, 100, 440, 420]
-    };
-    const res = {
-      detections: [fallbackDet],
-      risk_score: 35,
-      risk_level: "CAUTION",
-      processing_time_ms: 18
-    };
-    setCurrentFrameResults(res);
+    setCurrentFrameResults({
+      detections: [],
+      risk_score: 0,
+      risk_level: 'NORMAL',
+      message: noObjMessage
+    });
 
     if (canvasRef.current) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
-      drawBoundingBoxes(ctx, [fallbackDet], canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    announceDetection(fallbackDet);
+    speechService.triggerVibration([200]);
+
+    if (autoSpeak) {
+      speechService.speak(noObjMessage, currentLangObj.code, true);
+    }
   };
 
   const announceDetection = (detection) => {
-    const translation = getObjectTranslation(detection.class, selectedLang);
+    const clsName = detection.class_name || detection.class;
+    const translation = getObjectTranslation(clsName, selectedLang);
     const currentLangObj = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
-    
+
     speechService.triggerVibration([100, 50, 100]);
 
-    const announcementText = `${translation.translatedName} detected.`;
-    
+    const announcementPhrases = {
+      en: `${translation.translatedName} detected.`,
+      kn: `${translation.translatedName} ಪತ್ತೆಯಾಗಿದೆ.`,
+      te: `${translation.translatedName} గుర్తించబడింది.`,
+      ta: `${translation.translatedName} கண்டறியப்பட்டது.`,
+      ml: `${translation.translatedName} കണ്ടെത്തി.`
+    };
+    const announcementText = announcementPhrases[selectedLang] || announcementPhrases.en;
+
     if (autoSpeak) {
       speechService.speak(announcementText, currentLangObj.code, true);
     }
@@ -223,12 +229,12 @@ export default function Dashboard() {
       {
         id: Date.now(),
         timestamp: new Date().toLocaleTimeString(),
-        class: detection.class,
+        class: clsName,
         translatedName: translation.translatedName,
         englishName: translation.englishName,
         emoji: translation.emoji,
         confidence: detection.confidence,
-        position: detection.position,
+        position: detection.position || 'CENTER',
         lang: currentLangObj.name
       },
       ...prev.slice(0, 49)
@@ -241,263 +247,243 @@ export default function Dashboard() {
       const width = x2 - x1;
       const height = y2 - y1;
 
-      const translation = getObjectTranslation(d.class, selectedLang);
+      const clsName = d.class_name || d.class;
+      const translation = getObjectTranslation(clsName, selectedLang);
       const strokeColor = '#06b6d4';
 
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 4;
       ctx.strokeRect(x1, y1, width, height);
 
-      const labelText = `${translation.emoji} ${translation.translatedName.toUpperCase()} ${(d.confidence * 100).toFixed(0)}%`;
+      const confPct = (d.confidence * 100).toFixed(1);
+      const labelText = `${translation.emoji} ${translation.translatedName.toUpperCase()} ${confPct}%`;
       ctx.font = 'bold 15px Inter, sans-serif';
       const textWidth = ctx.measureText(labelText).width;
-      
+
       ctx.fillStyle = strokeColor;
       ctx.fillRect(x1, y1 > 28 ? y1 - 28 : y1, textWidth + 14, 28);
 
-      ctx.fillStyle = '#000000';
-      ctx.fillText(labelText, x1 + 6, y1 > 28 ? y1 - 9 : y1 + 19);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillText(labelText, x1 + 7, y1 > 28 ? y1 - 9 : y1 + 19);
     });
   };
 
-  const speakCurrentResult = () => {
-    const primary = currentFrameResults?.detections?.[0];
-    if (primary) {
-      announceDetection(primary);
-    } else {
-      const currentLangObj = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
-      speechService.speak("No object detected. Tap detect object.", currentLangObj.code);
-    }
-  };
-
-  const activeLangObj = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
-  const primaryDetection = currentFrameResults?.detections?.[0];
-  const primaryTranslation = primaryDetection ? getObjectTranslation(primaryDetection.class, selectedLang) : null;
+  const primaryDet = currentFrameResults?.detections?.[0];
+  const primaryTranslation = primaryDet ? getObjectTranslation(primaryDet.class_name || primaryDet.class, selectedLang) : null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans max-w-4xl mx-auto border-x border-slate-800 shadow-2xl">
-      
-      {/* Header */}
-      <header className="bg-slate-900 border-b border-slate-800 px-5 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-cyan-500/10 rounded-2xl border border-cyan-500/30">
-            <Eye className="w-7 h-7 text-cyan-400" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      {/* HEADER BAR */}
+      <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-gradient-to-tr from-cyan-600 to-blue-600 rounded-2xl shadow-lg shadow-cyan-500/20">
+              <Eye className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="font-black text-xl tracking-tight text-white flex items-center space-x-2">
+                <span>DRISHTI AI</span>
+                <span className="text-xs bg-cyan-950 border border-cyan-500/40 text-cyan-400 font-bold px-2 py-0.5 rounded-full">v1.0 REAL</span>
+              </h1>
+              <p className="text-xs text-slate-400 font-medium">Assistive Vision for Visually Impaired Users</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400">
-              DRISHTI AI
-            </h1>
-            <p className="text-xs text-cyan-300 font-semibold tracking-wider uppercase">Assistive Vision System for Visually Impaired</p>
-          </div>
-        </div>
 
-        {/* Selected Language Pill */}
-        <div className="flex items-center space-x-2">
-          <span className="text-xs bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl font-extrabold text-cyan-300 flex items-center space-x-1.5">
-            <span>{activeLangObj.flag}</span>
-            <span>{activeLangObj.native}</span>
-          </span>
+          <div className="flex items-center space-x-3">
+            <div className={`flex items-center space-x-2 text-xs font-bold px-3 py-1.5 rounded-full border ${
+              backendOnline ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-400' : 'bg-rose-950/80 border-rose-500/50 text-rose-400'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${backendOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></span>
+              <span>{backendOnline ? 'AI BACKEND ONLINE' : 'BACKEND DISCONNECTED'}</span>
+            </div>
+
+            <button
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              className="p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-200 transition"
+              title="Upload photo for object detection"
+            >
+              <Upload className="w-5 h-5" />
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept="image/*"
+              className="hidden"
+            />
+          </div>
         </div>
       </header>
 
-      {/* 4 Main Sections Navigation Tabs */}
-      <nav className="bg-slate-900/80 border-b border-slate-800 px-4 flex items-center justify-around">
-        <button
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center py-3 px-3 border-b-2 text-xs font-black transition-all ${
-            activeTab === 'home' ? 'border-cyan-400 text-cyan-400 bg-cyan-950/30' : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          <Camera className="w-5 h-5 mb-1" />
-          <span>🏠 Home</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('language')}
-          className={`flex flex-col items-center py-3 px-3 border-b-2 text-xs font-black transition-all ${
-            activeTab === 'language' ? 'border-cyan-400 text-cyan-400 bg-cyan-950/30' : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          <Globe className="w-5 h-5 mb-1" />
-          <span>🌐 Language</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex flex-col items-center py-3 px-3 border-b-2 text-xs font-black transition-all ${
-            activeTab === 'history' ? 'border-cyan-400 text-cyan-400 bg-cyan-950/30' : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          <History className="w-5 h-5 mb-1" />
-          <span>📊 History</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`flex flex-col items-center py-3 px-3 border-b-2 text-xs font-black transition-all ${
-            activeTab === 'settings' ? 'border-cyan-400 text-cyan-400 bg-cyan-950/30' : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          <Settings className="w-5 h-5 mb-1" />
-          <span>⚙️ Settings</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('demo')}
-          className={`flex flex-col items-center py-3 px-3 border-b-2 text-xs font-black transition-all ${
-            activeTab === 'demo' ? 'border-cyan-400 text-cyan-400 bg-cyan-950/30' : 'border-transparent text-slate-400 hover:text-white'
-          }`}
-        >
-          <Sparkles className="w-5 h-5 mb-1" />
-          <span>🧪 Demo Mode</span>
-        </button>
+      {/* NAVIGATION TABS */}
+      <nav className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-2 sticky top-[73px] z-40">
+        <div className="max-w-4xl mx-auto flex space-x-2 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'home', label: 'Home Dashboard', icon: Eye },
+            { id: 'language', label: 'Language', icon: Globe },
+            { id: 'history', label: 'Detection History', icon: History },
+            { id: 'settings', label: 'Settings', icon: Settings },
+            { id: 'demo', label: 'Evaluation', icon: Sparkles }
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition whitespace-nowrap ${
+                  isActive
+                    ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/25'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-5 space-y-6">
-        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
+      {/* MAIN CONTAINER */}
+      <main className="max-w-4xl mx-auto w-full p-4 flex-1 space-y-6">
 
-        {/* 1. HOME SECTION */}
+        {/* CAMERA ERROR ALERT */}
+        {cameraError && (
+          <div className="p-4 bg-rose-950/80 border border-rose-500/40 rounded-2xl flex items-start space-x-3 text-rose-200 text-xs">
+            <AlertOctagon className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-sm text-rose-300">Camera Notice</p>
+              <p>{cameraError}</p>
+            </div>
+          </div>
+        )}
+
+        {/* 1. HOME DASHBOARD TAB */}
         {activeTab === 'home' && (
           <div className="space-y-6">
-            
-            {/* Viewport Card */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-xl">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-                <span className="flex items-center space-x-1.5">
-                  <Camera className="w-4 h-4 text-cyan-400" />
-                  <span>CAMERA PREVIEW ({facingMode === 'environment' ? 'Rear Camera' : 'Front Camera'})</span>
-                </span>
-                
-                <div className="flex space-x-2">
-                  <button
-                    onClick={switchCameraFacing}
-                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold flex items-center space-x-1 border border-slate-700"
-                    title="Switch Rear / Front Camera"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Flip</span>
-                  </button>
-
-                  <button
-                    onClick={toggleWebcam}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 transition ${
-                      isWebcamActive ? 'bg-red-600 text-white' : 'bg-cyan-600 hover:bg-cyan-500 text-white'
-                    }`}
-                  >
-                    {isWebcamActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                    <span>{isWebcamActive ? 'Stop Camera' : 'Start Camera'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center space-x-1 border border-slate-700"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Upload</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Camera Error Banner */}
-              {cameraError && (
-                <div className="bg-red-950/80 border border-red-500/50 text-red-200 text-xs font-bold p-3 rounded-xl flex items-center space-x-2">
-                  <ShieldAlert className="w-5 h-5 text-red-400 flex-shrink-0" />
-                  <span>{cameraError}</span>
-                </div>
-              )}
-
-              {/* Viewport Box (Video / Canvas) */}
-              <div className="relative aspect-video bg-black rounded-2xl overflow-hidden flex items-center justify-center border-2 border-slate-800 shadow-inner">
-                
-                {/* Live Video Stream View */}
-                <video
-                  ref={videoRef}
-                  className={isWebcamActive ? "w-full h-full object-cover rounded-2xl" : "hidden"}
-                  autoPlay
-                  playsInline
-                  muted
-                />
-
-                {/* Canvas Overlay for detection bounding boxes */}
-                <canvas
-                  ref={canvasRef}
-                  className={!isWebcamActive && currentFrameResults ? "max-w-full max-h-full object-contain" : "absolute inset-0 w-full h-full pointer-events-none"}
-                />
-
-                {!currentFrameResults && !isWebcamActive && (
-                  <div className="text-center p-6 space-y-2">
-                    <Camera className="w-16 h-16 text-slate-700 mx-auto" />
-                    <p className="text-slate-400 text-sm font-medium">Tap <strong>Start Camera</strong> to view back camera, then tap DETECT OBJECT below.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* HUGE HIGH-CONTRAST DETECT OBJECT BUTTON (~40% Screen Focus) */}
-            <button
-              onClick={triggerObjectDetection}
-              disabled={isDetecting}
-              className="w-full py-8 px-6 bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 hover:from-cyan-300 hover:to-blue-500 active:scale-95 text-slate-950 font-black text-3xl tracking-wider rounded-3xl shadow-2xl shadow-cyan-500/40 border-4 border-cyan-200 flex flex-col items-center justify-center space-y-2 transition-all cursor-pointer"
-              aria-label="Detect Object Now"
-            >
-              <div className="p-3 bg-slate-950/20 rounded-full">
-                <Sparkles className="w-10 h-10 stroke-[3]" />
-              </div>
-              <span>{isDetecting ? 'DETECTING OBJECT...' : 'DETECT OBJECT 🔍'}</span>
-            </button>
-
-            {/* LAST DETECTION DISPLAY CARD */}
-            {primaryDetection ? (
-              <div className="bg-slate-900 border-2 border-cyan-500/50 p-6 rounded-3xl shadow-2xl space-y-4 animate-fadeIn">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <span className="text-xs font-black text-cyan-400 uppercase tracking-widest">OBJECT DETECTED</span>
-                  <span className="text-xs bg-slate-800 font-bold px-3 py-1 rounded-lg text-emerald-400 border border-slate-700">
-                    {(primaryDetection.confidence * 100).toFixed(0)}% Confidence
+            {/* LIVE CAMERA VIEWER & DETECT PANEL */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl relative overflow-hidden space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Camera className="w-5 h-5 text-cyan-400" />
+                  <span className="font-extrabold text-sm uppercase tracking-wider text-slate-200">
+                    MOBILE CAMERA FRAME (ENVIRONMENT REAR CAMERA)
                   </span>
                 </div>
-
-                <div className="flex items-center space-x-6 py-2">
-                  <div className="text-6xl p-4 bg-slate-950 border border-slate-800 rounded-3xl flex items-center justify-center">
-                    {primaryTranslation.emoji}
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-3xl font-black text-white">{primaryTranslation.translatedName}</div>
-                    <div className="text-sm font-bold text-slate-400">English: {primaryTranslation.englishName}</div>
-                    <div className="text-xs text-cyan-400 font-bold">Position: {primaryDetection.position} | Proximity: {primaryDetection.distance}</div>
-                  </div>
-                </div>
-
                 <button
-                  onClick={speakCurrentResult}
-                  className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-extrabold text-base rounded-2xl border border-slate-700 flex items-center justify-center space-x-2 transition"
+                  onClick={switchCameraFacing}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-bold text-cyan-400 flex items-center space-x-1 transition"
                 >
-                  <Volume2 className="w-5 h-5 text-cyan-400" />
-                  <span>🔊 SPEAK RESULT ({activeLangObj.native})</span>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>FLIP CAMERA</span>
                 </button>
+              </div>
 
-                {currentFrameResults.detections.length > 1 && (
-                  <div className="pt-2 border-t border-slate-800 text-xs space-y-1.5">
-                    <span className="text-slate-400 font-bold uppercase block">All Visible Objects:</span>
-                    {currentFrameResults.detections.map((d, i) => {
-                      const tr = getObjectTranslation(d.class, selectedLang);
-                      return (
-                        <div key={i} className="flex justify-between font-medium text-slate-300">
-                          <span>{i + 1}. {tr.emoji} {tr.translatedName} ({tr.englishName})</span>
-                          <span className="text-cyan-400 font-bold">{(d.confidence * 100).toFixed(0)}%</span>
-                        </div>
-                      );
-                    })}
+              {/* CAMERA VIDEO & DRAWING CANVAS */}
+              <div className="relative aspect-video bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                <video
+                  ref={videoRef}
+                  playsInline
+                  muted
+                  className={`w-full h-full object-cover ${isWebcamActive ? 'block' : 'hidden'}`}
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                />
+
+                {!isWebcamActive && (
+                  <div className="text-center p-6 space-y-3">
+                    <Smartphone className="w-12 h-12 text-slate-700 mx-auto" />
+                    <p className="text-slate-400 font-medium text-sm">Camera stream is paused.</p>
+                    <button
+                      onClick={toggleWebcam}
+                      className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 transition"
+                    >
+                      START ENVIRONMENT CAMERA
+                    </button>
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl text-center text-slate-500 space-y-2">
-                <AlertOctagon className="w-10 h-10 mx-auto text-slate-700" />
-                <p className="text-sm font-semibold">No object detected yet. Point camera and tap DETECT OBJECT.</p>
-              </div>
-            )}
 
+              {/* HUGE DETECT OBJECT BUTTON (~45% HEIGHT AREA) */}
+              <button
+                onClick={triggerObjectDetection}
+                disabled={isDetecting}
+                className={`w-full py-8 sm:py-10 rounded-3xl font-black text-2xl sm:text-3xl tracking-wider uppercase transition shadow-2xl flex items-center justify-center space-x-4 border-2 ${
+                  isDetecting
+                    ? 'bg-amber-500 border-amber-400 text-slate-950 animate-pulse'
+                    : primaryDet
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 border-cyan-300 text-slate-950 shadow-cyan-500/30'
+                    : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-cyan-400 text-white shadow-cyan-500/20'
+                }`}
+              >
+                <Eye className="w-9 h-9 sm:w-11 sm:h-11" />
+                <span>
+                  {isDetecting
+                    ? 'DETECTING...'
+                    : primaryDet
+                    ? 'OBJECT DETECTED 🔍'
+                    : currentFrameResults?.message
+                    ? 'NO OBJECT DETECTED 🔍'
+                    : 'DETECT OBJECT 🔍'}
+                </span>
+              </button>
+
+              {/* DETECTION RESULTS PANEL */}
+              {currentFrameResults && (
+                <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
+                  {primaryDet ? (
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-4xl">{primaryTranslation.emoji}</span>
+                        <div>
+                          <h2 className="text-2xl font-black text-cyan-400 tracking-tight">
+                            {primaryTranslation.translatedName}
+                          </h2>
+                          <p className="text-xs text-slate-400 font-bold">
+                            {primaryTranslation.englishName} ({selectedLang.toUpperCase()})
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xl font-black text-emerald-400">
+                          {(primaryDet.confidence * 100).toFixed(1)}%
+                        </div>
+                        <div className="text-[10px] text-slate-500 uppercase font-extrabold tracking-widest">
+                          CONFIDENCE
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl text-center space-y-1">
+                      <p className="font-extrabold text-amber-400 text-base">
+                        {currentFrameResults.message || 'No object detected. Please adjust the camera.'}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* MULTIPLE DETECTED OBJECTS LIST */}
+                  {currentFrameResults.detections && currentFrameResults.detections.length > 1 && (
+                    <div className="space-y-2 pt-2">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">All Detected Objects:</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {currentFrameResults.detections.map((det, idx) => {
+                          const trans = getObjectTranslation(det.class_name || det.class, selectedLang);
+                          return (
+                            <div key={idx} className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-200">{trans.emoji} {trans.translatedName}</span>
+                              <span className="font-extrabold text-emerald-400">{(det.confidence * 100).toFixed(1)}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -565,13 +551,15 @@ export default function Dashboard() {
                         <span>{log.englishName}</span>
                       </td>
                       <td className="p-3 font-extrabold text-cyan-300">{log.translatedName}</td>
-                      <td className="p-3 font-bold text-emerald-400">{(log.confidence * 100).toFixed(0)}%</td>
+                      <td className="p-3 font-bold text-emerald-400">{(log.confidence * 100).toFixed(1)}%</td>
                       <td className="p-3 font-bold text-slate-400">{log.lang}</td>
                     </tr>
                   ))}
                   {detectionLogs.length === 0 && (
                     <tr>
-                      <td colSpan="5" className="p-8 text-center text-slate-500">No detection history yet. Tap DETECT OBJECT to build log.</td>
+                      <td colSpan="5" className="p-8 text-center text-slate-500">
+                        No detection history yet. Point camera and tap DETECT OBJECT to perform real detection.
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -648,50 +636,31 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 5. DEMO SECTION */}
+        {/* 5. DEMO & EVALUATION SECTION */}
         {activeTab === 'demo' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-6">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h2 className="text-xl font-black text-cyan-400 uppercase tracking-wider flex items-center space-x-2">
                   <Sparkles className="w-6 h-6 text-cyan-400" />
-                  <span>COLLEGE DEMO & EVALUATION SCENARIOS</span>
+                  <span>CAMERA EVALUATION MODE</span>
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">Pre-configured test objects for offline evaluation.</p>
+                <p className="text-xs text-slate-400 mt-1">Tap DETECT OBJECT below or upload a photo to evaluate real model inference.</p>
               </div>
-              <span className="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-xs font-bold px-3 py-1 rounded-lg">DEMO MODE</span>
+              <span className="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-xs font-bold px-3 py-1 rounded-lg">100% REAL AI</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { cls: 'bottle', name: 'Bottle 🍾' },
-                { cls: 'cup', name: 'Cup ☕' },
-                { cls: 'mobile', name: 'Mobile 📱' },
-                { cls: 'book', name: 'Book 📖' },
-                { cls: 'chair', name: 'Chair 🪑' },
-                { cls: 'laptop', name: 'Laptop 💻' },
-                { cls: 'stairs', name: 'Stairs 🪜' },
-                { cls: 'car', name: 'Car 🚗' }
-              ].map(item => (
-                <button
-                  key={item.cls}
-                  onClick={() => {
-                    const mockDet = {
-                      class: item.cls,
-                      confidence: 0.94,
-                      position: 'CENTER',
-                      distance: 'NEAR',
-                      bbox: [200, 100, 440, 420]
-                    };
-                    const res = { detections: [mockDet], risk_score: 40, risk_level: 'CAUTION', processing_time_ms: 15 };
-                    setCurrentFrameResults(res);
-                    announceDetection(mockDet);
-                  }}
-                  className="p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl font-bold text-sm text-cyan-300 text-center transition"
-                >
-                  {item.name}
-                </button>
-              ))}
+            <div className="p-6 bg-slate-950 border border-slate-800 rounded-2xl text-center space-y-4">
+              <Eye className="w-12 h-12 text-cyan-400 mx-auto" />
+              <p className="text-slate-300 font-bold text-sm">
+                Point your mobile camera at any object or upload an image to run real YOLO detection.
+              </p>
+              <button
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                className="px-6 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 transition"
+              >
+                UPLOAD PHOTO FOR REAL INFERENCE
+              </button>
             </div>
           </div>
         )}

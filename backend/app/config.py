@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     TAGLINE: str = "Let AI Be Your Eyes."
     
     # Model Configuration
-    MODEL_PATH: str = os.getenv("MODEL_PATH", "yolov8n.pt")
-    CONFIDENCE_THRESHOLD: float = 0.20
+    MODEL_PATH: str = os.getenv("MODEL_PATH", "models/best.pt" if os.path.exists("models/best.pt") else "yolov8n.pt")
+    CONFIDENCE_THRESHOLD: float = 0.25
     IOU_THRESHOLD: float = 0.45
     
     # Image Input Configuration

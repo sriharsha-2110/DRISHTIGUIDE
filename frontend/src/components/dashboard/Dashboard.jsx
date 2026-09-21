@@ -3,7 +3,7 @@ import {
   Eye, Volume2, Globe, History, Settings, Play, Pause, Upload, Camera,
   CheckCircle2, RefreshCw, Sliders, Sparkles, AlertOctagon, Smartphone, ShieldAlert
 } from 'lucide-react';
-import { checkHealth, getModelInfo, analyzeImageBlob } from '../../services/api';
+import { checkHealth, getModelInfo, analyzeImageBlob, API_BASE_URL } from '../../services/api';
 import { speechService } from '../../services/speechService';
 import { LANGUAGES, getObjectTranslation, NO_OBJECT_TRANSLATIONS } from '../../services/translations';
 
@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('home'); // 'home', 'language', 'history', 'settings', 'demo'
   const [selectedLang, setSelectedLang] = useState('en'); // 'en', 'kn', 'te', 'ta', 'ml'
   const [backendOnline, setBackendOnline] = useState(true);
+  const [backendError, setBackendError] = useState(null);
   const [modelInfo, setModelInfo] = useState(null);
 
   // Camera facing mode: 'environment' (rear camera) by default for mobile
@@ -34,7 +35,15 @@ export default function Dashboard() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    checkHealth().then(res => setBackendOnline(res.status === 'online'));
+    checkHealth().then(res => {
+      const isOk = res.status === 'online';
+      setBackendOnline(isOk);
+      if (!isOk) {
+        setBackendError(res.error || 'Failed connecting to API base URL');
+      } else {
+        setBackendError(null);
+      }
+    });
     getModelInfo().then(res => setModelInfo(res));
   }, []);
 
@@ -99,6 +108,32 @@ export default function Dashboard() {
     }
   };
 
+  const getCanvasBlob = (canvas) => {
+    return new Promise(resolve => {
+      try {
+        const maxDim = 640;
+        let w = canvas.width || 640;
+        let h = canvas.height || 480;
+
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(canvas, 0, 0, w, h);
+
+        tempCanvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  };
+
   // Primary DETECT OBJECT Action
   const triggerObjectDetection = async () => {
     if (isDetecting) return;
@@ -118,25 +153,29 @@ export default function Dashboard() {
       speechService.speak(detectingPhrases[selectedLang] || detectingPhrases.en, currentLangObj.code);
     }
 
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    try {
+      if (videoRef.current && canvasRef.current) {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      canvas.toBlob(async (blob) => {
+        const blob = await getCanvasBlob(canvas);
         if (blob) {
           const res = await analyzeImageBlob(blob, true);
           handleDetectionResponse(res, canvas, ctx);
         } else {
           handleNoDetectionResponse();
         }
-        setIsDetecting(false);
-      }, 'image/jpeg', 0.85);
-    } else {
+      } else {
+        handleNoDetectionResponse();
+      }
+    } catch (err) {
+      console.error("Detection execution error:", err);
       handleNoDetectionResponse();
+    } finally {
       setIsDetecting(false);
     }
   };
@@ -145,23 +184,33 @@ export default function Dashboard() {
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    setIsDetecting(true);
 
     const img = new Image();
-    img.onload = () => {
-      const canvas = canvasRef.current;
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
+    img.onload = async () => {
+      try {
+        const canvas = canvasRef.current;
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
 
-      canvas.toBlob(async (blob) => {
+        const blob = await getCanvasBlob(canvas);
         if (blob) {
           const res = await analyzeImageBlob(blob, true);
           handleDetectionResponse(res, canvas, ctx);
         } else {
           handleNoDetectionResponse();
         }
-      }, 'image/jpeg', 0.9);
+      } catch (err) {
+        console.error("File detection error:", err);
+        handleNoDetectionResponse();
+      } finally {
+        setIsDetecting(false);
+      }
+    };
+    img.onerror = () => {
+      setIsDetecting(false);
     };
     img.src = URL.createObjectURL(file);
   };
@@ -243,7 +292,15 @@ export default function Dashboard() {
 
   const drawBoundingBoxes = (ctx, detections, imgW, imgH) => {
     detections.forEach(d => {
-      const [x1, y1, x2, y2] = d.bbox;
+      let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+      if (Array.isArray(d.bbox)) {
+        [x1, y1, x2, y2] = d.bbox;
+      } else if (d.bbox && typeof d.bbox === 'object') {
+        x1 = d.bbox.x1 || 0;
+        y1 = d.bbox.y1 || 0;
+        x2 = d.bbox.x2 || 0;
+        y2 = d.bbox.y2 || 0;
+      }
       const width = x2 - x1;
       const height = y2 - y1;
 
@@ -294,7 +351,7 @@ export default function Dashboard() {
               backendOnline ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-400' : 'bg-rose-950/80 border-rose-500/50 text-rose-400'
             }`}>
               <span className={`w-2 h-2 rounded-full ${backendOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></span>
-              <span>{backendOnline ? 'AI BACKEND ONLINE' : 'BACKEND DISCONNECTED'}</span>
+              <span>{backendOnline ? 'Backend connected' : 'Backend not connected'}</span>
             </div>
 
             <button
@@ -347,6 +404,18 @@ export default function Dashboard() {
 
       {/* MAIN CONTAINER */}
       <main className="max-w-4xl mx-auto w-full p-4 flex-1 space-y-6">
+
+        {/* BACKEND DISCONNECTED ALERT */}
+        {!backendOnline && (
+          <div className="p-4 bg-rose-950/80 border border-rose-500/40 rounded-2xl flex items-start space-x-3 text-rose-200 text-xs">
+            <AlertOctagon className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-sm text-rose-300">Backend Connection Error</p>
+              <p>Target URL: <code className="bg-slate-900 px-1.5 py-0.5 rounded font-mono text-cyan-300">{API_BASE_URL}</code></p>
+              {backendError && <p className="mt-1 text-slate-400 font-mono">Detail: {backendError}</p>}
+            </div>
+          </div>
+        )}
 
         {/* CAMERA ERROR ALERT */}
         {cameraError && (

@@ -18,26 +18,36 @@ const getApiBaseUrl = () => {
 export const API_BASE_URL = getApiBaseUrl();
 
 export async function checkHealth() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
   try {
-    let res = await fetch(`${API_BASE_URL}/api/health`);
+    let res = await fetch(`${API_BASE_URL}/api/health`, { signal: controller.signal });
     if (!res.ok) {
-      res = await fetch(`${API_BASE_URL}/`);
+      res = await fetch(`${API_BASE_URL}/`, { signal: controller.signal });
     }
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     return { status: 'online', data };
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error(`[API Connection Error] Failed connecting to backend at ${API_BASE_URL}:`, err);
     return { status: 'offline', error: err.message, url: API_BASE_URL };
   }
 }
 
 export async function getModelInfo() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
   try {
-    const res = await fetch(`${API_BASE_URL}/api/model-info`);
+    const res = await fetch(`${API_BASE_URL}/api/model-info`, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error(`[Model Info Error] ${API_BASE_URL}:`, err);
     return { status: 'error', error: err.message };
   }
@@ -67,15 +77,22 @@ export async function analyzeImageBlob(imageBlob, force = false) {
   const formData = new FormData();
   formData.append('file', imageBlob, 'frame.jpg');
 
+  // Enforce 30-second timeout to handle Render free tier cold starts & mobile networks smoothly
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
   try {
     const res = await fetch(`${API_BASE_URL}/api/detect`, {
       method: 'POST',
       body: formData,
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.error(`[Detection API Error] Target ${API_BASE_URL}/api/detect failed:`, err);
+    clearTimeout(timeoutId);
+    console.error(`[Detection API Error] Target ${API_BASE_URL}/api/detect failed or timed out:`, err);
     return null;
   }
 }

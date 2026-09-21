@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Eye, Volume2, Globe, History, Settings, Play, Pause, Upload, Camera,
-  CheckCircle2, RefreshCw, Sliders, Sparkles, AlertOctagon, Smartphone
+  CheckCircle2, RefreshCw, Sliders, Sparkles, AlertOctagon, Smartphone, ShieldAlert
 } from 'lucide-react';
 import { checkHealth, getModelInfo, analyzeImageBlob } from '../../services/api';
 import { speechService } from '../../services/speechService';
@@ -12,6 +12,10 @@ export default function Dashboard() {
   const [selectedLang, setSelectedLang] = useState('en'); // 'en', 'kn', 'te', 'ta', 'ml'
   const [backendOnline, setBackendOnline] = useState(true);
   const [modelInfo, setModelInfo] = useState(null);
+
+  // Camera facing mode: 'environment' (rear camera) by default for mobile
+  const [facingMode, setFacingMode] = useState('environment');
+  const [cameraError, setCameraError] = useState(null);
 
   // Settings states
   const [speechRate, setSpeechRate] = useState(1.0);
@@ -34,7 +38,7 @@ export default function Dashboard() {
     getModelInfo().then(res => setModelInfo(res));
   }, []);
 
-  // Update speech service when settings or language change
+  // Update speech service settings
   useEffect(() => {
     const currentLangObj = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
     speechService.setSettings({
@@ -45,24 +49,53 @@ export default function Dashboard() {
     });
   }, [selectedLang, speechRate, speechVolume, vibrationEnabled]);
 
-  // Toggle Live Webcam
+  // Toggle Rear / Front Mobile Camera Stream
   const toggleWebcam = async () => {
+    setCameraError(null);
     if (isWebcamActive) {
       if (videoRef.current && videoRef.current.srcObject) {
         videoRef.current.srcObject.getTracks().forEach(t => t.stop());
       }
       setIsWebcamActive(false);
     } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        setIsWebcamActive(true);
-      } catch (e) {
-        alert("Camera error: " + e.message);
+      await startCameraStream(facingMode);
+    }
+  };
+
+  const startCameraStream = async (targetFacingMode) => {
+    setCameraError(null);
+    try {
+      if (videoRef.current && videoRef.current.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(t => t.stop());
       }
+
+      const constraints = {
+        video: {
+          facingMode: { ideal: targetFacingMode },
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        },
+        audio: false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setIsWebcamActive(true);
+    } catch (e) {
+      console.warn("Camera getUserMedia error:", e);
+      setCameraError("Camera access failed. Please ensure camera permissions are granted and the site is opened via HTTPS.");
+      setIsWebcamActive(false);
+    }
+  };
+
+  const switchCameraFacing = async () => {
+    const nextFacingMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(nextFacingMode);
+    if (isWebcamActive) {
+      await startCameraStream(nextFacingMode);
     }
   };
 
@@ -71,10 +104,8 @@ export default function Dashboard() {
     if (isDetecting) return;
     setIsDetecting(true);
 
-    // Haptic vibration feedback
     speechService.triggerVibration([80]);
 
-    // Spoken feedback
     if (autoSpeak) {
       const currentLangObj = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
       const detectingPhrases = {
@@ -87,7 +118,6 @@ export default function Dashboard() {
       speechService.speak(detectingPhrases[selectedLang] || detectingPhrases.en, currentLangObj.code);
     }
 
-    // Capture canvas frame from webcam or default canvas
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -175,7 +205,6 @@ export default function Dashboard() {
     const translation = getObjectTranslation(detection.class, selectedLang);
     const currentLangObj = LANGUAGES.find(l => l.id === selectedLang) || LANGUAGES[0];
     
-    // Double vibration feedback on detection completion
     speechService.triggerVibration([100, 50, 100]);
 
     const announcementText = `${translation.translatedName} detected.`;
@@ -184,7 +213,6 @@ export default function Dashboard() {
       speechService.speak(announcementText, currentLangObj.code, true);
     }
 
-    // Add to history log
     setDetectionLogs(prev => [
       {
         id: Date.now(),
@@ -208,7 +236,7 @@ export default function Dashboard() {
       const height = y2 - y1;
 
       const translation = getObjectTranslation(d.class, selectedLang);
-      const strokeColor = '#06b6d4'; // Cyan primary
+      const strokeColor = '#06b6d4';
 
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 4;
@@ -321,7 +349,6 @@ export default function Dashboard() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-5 space-y-6">
-        <video ref={videoRef} className="hidden" playsInline muted />
         <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
 
         {/* 1. HOME SECTION */}
@@ -333,14 +360,23 @@ export default function Dashboard() {
               <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                 <span className="flex items-center space-x-1.5">
                   <Camera className="w-4 h-4 text-cyan-400" />
-                  <span>CAMERA PREVIEW</span>
+                  <span>CAMERA PREVIEW ({facingMode === 'environment' ? 'Rear Camera' : 'Front Camera'})</span>
                 </span>
                 
                 <div className="flex space-x-2">
                   <button
+                    onClick={switchCameraFacing}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold flex items-center space-x-1 border border-slate-700"
+                    title="Switch Rear / Front Camera"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Flip</span>
+                  </button>
+
+                  <button
                     onClick={toggleWebcam}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 ${
-                      isWebcamActive ? 'bg-red-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                    className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 transition ${
+                      isWebcamActive ? 'bg-red-600 text-white' : 'bg-cyan-600 hover:bg-cyan-500 text-white'
                     }`}
                   >
                     {isWebcamActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
@@ -349,21 +385,44 @@ export default function Dashboard() {
 
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center space-x-1"
+                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center space-x-1 border border-slate-700"
                   >
                     <Upload className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Upload Image</span>
+                    <span>Upload</span>
                   </button>
                 </div>
               </div>
 
-              {/* Canvas Viewport */}
+              {/* Camera Error Banner */}
+              {cameraError && (
+                <div className="bg-red-950/80 border border-red-500/50 text-red-200 text-xs font-bold p-3 rounded-xl flex items-center space-x-2">
+                  <ShieldAlert className="w-5 h-5 text-red-400 flex-shrink-0" />
+                  <span>{cameraError}</span>
+                </div>
+              )}
+
+              {/* Viewport Box (Video / Canvas) */}
               <div className="relative aspect-video bg-black rounded-2xl overflow-hidden flex items-center justify-center border-2 border-slate-800 shadow-inner">
-                <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
+                
+                {/* Live Video Stream View */}
+                <video
+                  ref={videoRef}
+                  className={isWebcamActive ? "w-full h-full object-cover rounded-2xl" : "hidden"}
+                  autoPlay
+                  playsInline
+                  muted
+                />
+
+                {/* Canvas Overlay for detection bounding boxes */}
+                <canvas
+                  ref={canvasRef}
+                  className={!isWebcamActive && currentFrameResults ? "max-w-full max-h-full object-contain" : "absolute inset-0 w-full h-full pointer-events-none"}
+                />
+
                 {!currentFrameResults && !isWebcamActive && (
                   <div className="text-center p-6 space-y-2">
                     <Camera className="w-16 h-16 text-slate-700 mx-auto" />
-                    <p className="text-slate-400 text-sm font-medium">Point camera at an object and tap DETECT OBJECT below.</p>
+                    <p className="text-slate-400 text-sm font-medium">Tap <strong>Start Camera</strong> to view back camera, then tap DETECT OBJECT below.</p>
                   </div>
                 )}
               </div>
@@ -411,7 +470,6 @@ export default function Dashboard() {
                   <span>🔊 SPEAK RESULT ({activeLangObj.native})</span>
                 </button>
 
-                {/* Multiple objects list if available */}
                 {currentFrameResults.detections.length > 1 && (
                   <div className="pt-2 border-t border-slate-800 text-xs space-y-1.5">
                     <span className="text-slate-400 font-bold uppercase block">All Visible Objects:</span>
@@ -525,7 +583,6 @@ export default function Dashboard() {
             </h2>
 
             <div className="space-y-5 text-sm">
-              {/* Voice Speed */}
               <div className="space-y-2 bg-slate-800/60 p-4 rounded-2xl border border-slate-700">
                 <div className="flex justify-between font-bold">
                   <span>Voice Speed</span>
@@ -542,7 +599,6 @@ export default function Dashboard() {
                 />
               </div>
 
-              {/* Voice Volume */}
               <div className="space-y-2 bg-slate-800/60 p-4 rounded-2xl border border-slate-700">
                 <div className="flex justify-between font-bold">
                   <span>Voice Volume</span>
@@ -559,7 +615,6 @@ export default function Dashboard() {
                 />
               </div>
 
-              {/* Vibration Toggle */}
               <div className="flex items-center justify-between bg-slate-800/60 p-4 rounded-2xl border border-slate-700 font-bold">
                 <span>Haptic Vibration Feedback</span>
                 <button
@@ -572,7 +627,6 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {/* Auto Speak Toggle */}
               <div className="flex items-center justify-between bg-slate-800/60 p-4 rounded-2xl border border-slate-700 font-bold">
                 <span>Auto Speak Result</span>
                 <button
@@ -588,7 +642,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 5. DEMO & EVALUATOR MODE SECTION */}
+        {/* 5. DEMO SECTION */}
         {activeTab === 'demo' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-6">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">

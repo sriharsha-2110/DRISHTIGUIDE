@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     
     # Model Configuration
     MODEL_PATH: str = os.getenv("MODEL_PATH", "yolov8n.pt")
-    CONFIDENCE_THRESHOLD: float = 0.45
+    CONFIDENCE_THRESHOLD: float = 0.20
     IOU_THRESHOLD: float = 0.45
     
     # Image Input Configuration

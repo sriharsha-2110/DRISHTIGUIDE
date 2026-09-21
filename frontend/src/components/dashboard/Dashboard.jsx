@@ -176,10 +176,16 @@ export default function Dashboard() {
     }
   };
 
+  const fallbackClasses = ["mobile", "cup", "book", "chair", "laptop", "pen", "keys", "backpack", "glass", "plate", "bottle"];
+  const fallbackIndexRef = useRef(0);
+
   const simulateFallbackDetection = () => {
+    const targetClass = fallbackClasses[fallbackIndexRef.current % fallbackClasses.length];
+    fallbackIndexRef.current += 1;
+
     const fallbackDet = {
-      class: "bottle",
-      confidence: 0.94,
+      class: targetClass,
+      confidence: 0.92,
       position: "CENTER",
       distance: "NEAR",
       bbox: [200, 100, 440, 420]

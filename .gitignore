@@ -32,6 +32,7 @@ models/runs/
 *.onnx
 *.engine
 *.tflite
+!models/best.pt
 
 # Temporary download datasets & zip packages
 DrishtiAI_Dataset/

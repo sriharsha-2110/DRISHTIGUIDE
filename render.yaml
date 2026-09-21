@@ -1,7 +1,7 @@
 services:
   # 1. FastAPI AI Backend Web Service
   - type: web
-    name: drishti-ai-backend
+    name: drishti-ai-backend-vwl4
     env: python
     buildCommand: pip install -r backend/requirements.txt || pip install -r requirements.txt
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
@@ -11,7 +11,7 @@ services:
       - key: MODEL_PATH
         value: yolov8n.pt
       - key: CONFIDENCE_THRESHOLD
-        value: 0.45
+        value: 0.25
 
   # 2. React Vite Frontend Static Site
   - type: web
@@ -25,7 +25,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: drishti-ai-backend
-          property: host
+        value: https://drishti-ai-backend-vwl4.onrender.com

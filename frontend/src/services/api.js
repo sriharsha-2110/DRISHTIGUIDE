@@ -1,29 +1,34 @@
 const getApiBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
-    let url = import.meta.env.VITE_API_URL;
+    let url = import.meta.env.VITE_API_URL.trim();
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = `https://${url}`;
     }
-    return url;
+    return url.replace(/\/+$/, '');
   }
   if (typeof window !== 'undefined' && window.location) {
     const host = window.location.hostname;
-    if (host !== 'localhost' && host !== '127.0.0.1') {
-      return 'https://drishti-ai-backend.onrender.com';
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:8000';
     }
   }
-  return 'http://localhost:8000';
+  return 'https://drishti-ai-backend-vwl4.onrender.com';
 };
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 
 export async function checkHealth() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/health`);
+    let res = await fetch(`${API_BASE_URL}/api/health`);
+    if (!res.ok) {
+      res = await fetch(`${API_BASE_URL}/`);
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    return { status: 'online', data };
   } catch (err) {
-    return { status: 'offline', error: err.message };
+    console.error(`[API Connection Error] Failed connecting to backend at ${API_BASE_URL}:`, err);
+    return { status: 'offline', error: err.message, url: API_BASE_URL };
   }
 }
 
@@ -33,6 +38,7 @@ export async function getModelInfo() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
+    console.error(`[Model Info Error] ${API_BASE_URL}:`, err);
     return { status: 'error', error: err.message };
   }
 }
@@ -69,7 +75,7 @@ export async function analyzeImageBlob(imageBlob, force = false) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.warn('API connection failed:', err);
+    console.error(`[Detection API Error] Target ${API_BASE_URL}/api/detect failed:`, err);
     return null;
   }
 }

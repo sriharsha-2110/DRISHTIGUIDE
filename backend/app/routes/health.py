@@ -7,11 +7,14 @@ router = APIRouter(prefix="/api", tags=["Health"])
 @router.get("/health")
 def get_health():
     loader = ModelLoader.get_instance()
+    info = loader.get_info()
     return {
         "status": "online",
         "project": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "tagline": settings.TAGLINE,
         "model_status": loader.load_status,
-        "model_name": loader.get_info()["model_name"]
+        "model_name": info["model_name"],
+        "classes_count": info["classes_count"],
+        "model_classes": info["model_classes"]
     }

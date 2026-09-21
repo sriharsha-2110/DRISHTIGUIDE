@@ -20,10 +20,13 @@ class Settings(BaseSettings):
     
     # CORS Configuration
     CORS_ORIGINS: List[str] = [
+        "https://drishti-ai-backend-vwl4.onrender.com",
+        "https://drishti-ai-frontend-vwl4.onrender.com",
+        "https://drishtiguide-ai.onrender.com",
+        "https://drishti-ai-frontend.onrender.com",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
-        "https://drishtiguide-ai.onrender.com",
         "*"
     ]
     

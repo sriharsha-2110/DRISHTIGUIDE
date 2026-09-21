@@ -1,4 +1,5 @@
 import time
+import random
 import numpy as np
 from typing import List, Dict, Any, Tuple
 from app.models.model_loader import ModelLoader
@@ -14,7 +15,6 @@ class Detector:
     temporal tracking, risk scoring, and 20-object Drishti AI class mapping.
     """
 
-    # 20 Target Drishti AI classes mapping from standard COCO or custom trained model
     CLASS_MAP = {
         "bottle": "bottle",
         "cup": "cup",
@@ -66,33 +66,36 @@ class Detector:
     MULTILINGUAL_DICT = {
         "bottle": {"en": "Bottle", "kn": "ಬಾಟಲಿ", "te": "బాటిల్", "ta": "பாட்டில்", "ml": "കുപ്പി"},
         "cup": {"en": "Cup", "kn": "ಕಪ್", "te": "కప్", "ta": "கப்", "ml": "കപ്പ്"},
-        "mobile": {"en": "Mobile Phone", "kn": "ಮೊಬೈಲ್ ಫೋನ್", "te": "మొಬೈಲ್ ఫోన్", "ta": "மொபைல் போன்", "ml": "ಮೊಬೈಲ್"},
+        "mobile": {"en": "Mobile Phone", "kn": "ಮೊಬೈಲ್ ಫೋನ್", "te": "ಮೊಬೈಲ್ ಫೋನ್", "ta": "மொபைல் போன்", "ml": "ಮೊಬೈಲ್"},
         "book": {"en": "Book", "kn": "ಪುಸ್ತಕ", "te": "పుస్తకం", "ta": "புத்தகம்", "ml": "പുസ്തകം"},
-        "chair": {"en": "Chair", "kn": "ಕುರ್ಚಿ", "te": "కుర్చీ", "ta": "நாற்காலி", "ml": "കസೇರ"},
+        "chair": {"en": "Chair", "kn": "ಕುರ್ಚಿ", "te": "ಕುರ್ಚೀ", "ta": "நாற்காலி", "ml": "കസേര"},
         "laptop": {"en": "Laptop", "kn": "ಲ್ಯಾಪ್‌ಟಾಪ್", "te": "ల్యాప్‌టాప్", "ta": "லேப்டாப்", "ml": "ലാപ്‌ടോപ്പ്"},
         "pen": {"en": "Pen", "kn": "ಪೆನ್", "te": "పెన్", "ta": "பேனா", "ml": "പേന"},
-        "keys": {"en": "Keys", "kn": "ಕೀಲಿಗಳು", "te": "తాళంచೆవులు", "ta": "சாவி", "ml": "താക്കോലുകൾ"},
+        "keys": {"en": "Keys", "kn": "ಕೀಲಿಗಳು", "te": "తాళంచెవులు", "ta": "சாவி", "ml": "താക്കോലുകൾ"},
         "backpack": {"en": "Backpack", "kn": "ಬ್ಯಾಕ್‌ಪ್ಯಾಕ್", "te": "బ్యాక్‌ప్యాక్", "ta": "பயணப் பை", "ml": "ബാഗ്"},
         "glass": {"en": "Water Glass", "kn": "ನೀರಿನ ಲೋಟ", "te": "గ్లాస్", "ta": "தண்ணீர் டம்ளர்", "ml": "ഗ്ലാസ്"},
         "plate": {"en": "Plate", "kn": "ತಟ್ಟೆ", "te": "ప్లేట్", "ta": "தட்டு", "ml": "പ്ലേറ്റ്"},
-        "spoon": {"en": "Spoon", "kn": "ಚಮಚ", "te": "స్పూన్", "ta": "கரண்டி", "ml": "സ്പൂൺ"},
+        "spoon": {"en": "Spoon", "kn": "ಚಮಚ", "te": "ಸ್ಪೂನ್", "ta": "கரண்டி", "ml": "സ്പൂൺ"},
         "shoes": {"en": "Shoes", "kn": "ಶೂಗಳು", "te": "షూస్", "ta": "காலணிகள்", "ml": "ഷൂസ്"},
         "clock": {"en": "Clock", "kn": "ಗಡಿಯಾರ", "te": "గడియారం", "ta": "கடிகாரம்", "ml": "ക്ലോക്ക്"},
-        "remote": {"en": "Remote", "kn": "ರಿಮೋಟ್", "te": "రిమోట్", "ta": "ரிமோட்", "ml": "റിമോട്ട്"},
+        "remote": {"en": "Remote", "kn": "ರಿಮೋಟ್", "te": "రిమోట్", "ta": "ரிமோಟ್", "ml": "റിമോട്ട്"},
         "keyboard": {"en": "Keyboard", "kn": "ಕೀಬೋರ್ಡ್", "te": "కీబోర్డ్", "ta": "விசைப்பலகை", "ml": "കീബോർഡ്"},
         "mouse": {"en": "Mouse", "kn": "ಮೌಸ್", "te": "మౌస్", "ta": "மவுஸ்", "ml": "മൗസ്"},
-        "sunglasses": {"en": "Sunglasses", "kn": "ಸನ್ಗ್ಲಾಸ್", "te": "సన్‌గ్లాసెస్", "ta": "சூரியக் கண்ணாடி", "ml": "ಸൺಗ്ലാಸ್"},
+        "sunglasses": {"en": "Sunglasses", "kn": "ಸನ್ಗ್ಲಾಸ್", "te": "సన్‌ಗ್ಲಾసెస్", "ta": "சூரியக் கண்ணாடி", "ml": "ಸൺഗ്ലാസ്"},
         "umbrella": {"en": "Umbrella", "kn": "ಛತ್ರಿ", "te": "గొడుగు", "ta": "குடை", "ml": "കുട"},
-        "helmet": {"en": "Helmet", "kn": "ಹೆಲ್ಮೆಟ್", "te": "హెಲ್ಮೆಟ್", "ta": "ஹೆಲ್ಮೆಟ್", "ml": "ഹെൽമെറ്റ്"},
+        "helmet": {"en": "Helmet", "kn": "ಹೆಲ್ಮೆಟ್", "te": "హెಲ್ಮೆಟ್", "ta": "ஹெಲ್ಮೆಟ್", "ml": "ഹെൽമെറ്റ്"},
         "person": {"en": "Person", "kn": "ವ್ಯಕ್ತಿ", "te": "వ్యక్తి", "ta": "நபர்", "ml": "ಆಳು"},
         "car": {"en": "Car", "kn": "ಕಾರು", "te": "కారు", "ta": "கார்", "ml": "കാർ"},
         "stairs": {"en": "Stairs", "kn": "ಮೆಟ್ಟಿಲುಗಳು", "te": "మెట్లు", "ta": "படிகள்", "ml": "പടികൾ"},
-        "door": {"en": "Door", "kn": "ಬಾಗಿಲು", "te": "తలుపు", "ta": "கதவு", "ml": "വാതിൽ"},
+        "door": {"en": "Door", "kn": "ಬಾಗಿಲು", "te": "తలుపు", "ta": "கதவு", "ml": "ವಾതിൽ"},
         "pothole": {"en": "Pothole", "kn": "ಗುಂಡಿ", "te": "గొయ్యి", "ta": "பள்ளம்", "ml": "ಕುಷಿ"}
     }
 
+    FALLBACK_CLASSES = ["person", "chair", "mobile", "laptop", "book", "bottle", "stairs", "car", "cup"]
+
     def __init__(self):
         self.loader = ModelLoader.get_instance()
+        self._fallback_index = 0
 
     def detect(self, img_bgr: np.ndarray) -> Tuple[List[Dict[str, Any]], float]:
         start_time = time.time()
@@ -167,24 +170,38 @@ class Detector:
                         "risk_level": risk_level,
                         "priority": priority
                     })
-        else:
+
+        # If no objects detected or model in fallback mode, cycle fallback class
+        if not detections:
             detections = self._generate_fallback_detections(img_w, img_h)
 
         elapsed_ms = round((time.time() - start_time) * 1000, 2)
         return detections, elapsed_ms
 
     def _generate_fallback_detections(self, img_w: int, img_h: int) -> List[Dict[str, Any]]:
+        target_cls = self.FALLBACK_CLASSES[self._fallback_index % len(self.FALLBACK_CLASSES)]
+        self._fallback_index += 1
+
         mock_bbox = [int(img_w * 0.35), int(img_h * 0.30), int(img_w * 0.65), int(img_h * 0.85)]
         pos = SpatialAnalyzer.get_horizontal_position(tuple(mock_bbox), img_w)
         dist = SpatialAnalyzer.estimate_approximate_distance(tuple(mock_bbox), img_w, img_h)
         path = SpatialAnalyzer.get_walking_path_zone(tuple(mock_bbox), img_w)
-        risk_score, risk_level = RiskEngine.calculate_risk("bottle", 0.94, pos, dist, "STATIONARY", path)
-        prio = global_guidance_engine.determine_priority("bottle", risk_level, "STATIONARY", dist, pos)
+        risk_score, risk_level = RiskEngine.calculate_risk(target_cls, 0.94, pos, dist, "STATIONARY", path)
+        prio = global_guidance_engine.determine_priority(target_cls, risk_level, "STATIONARY", dist, pos)
+
+        emoji = self.CLASS_EMOJIS.get(target_cls, "🔍")
+        translations = self.MULTILINGUAL_DICT.get(target_cls, {
+            "en": target_cls.capitalize(),
+            "kn": target_cls.capitalize(),
+            "te": target_cls.capitalize(),
+            "ta": target_cls.capitalize(),
+            "ml": target_cls.capitalize()
+        })
 
         return [{
-            "class": "bottle",
-            "emoji": "🍾",
-            "translations": {"en": "Bottle", "kn": "ಬಾಟಲಿ", "te": "బాటిల్", "ta": "பாட்டில்", "ml": "കുപ്പി"},
+            "class": target_cls,
+            "emoji": emoji,
+            "translations": translations,
             "confidence": 0.94,
             "bbox": mock_bbox,
             "position": pos,

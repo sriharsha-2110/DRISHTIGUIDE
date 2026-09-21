@@ -3,14 +3,14 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/api", tags=["Dataset"])
 
-DATASETS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "datasets")
+DATASETS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "datasets"))
 
 @router.get("/dataset")
 def get_dataset_info():
     """
     GET /api/dataset
     Scans datasets directory for images, split folders (train, val, test), and class distributions.
-    Returns configured status and sample metadata. If datasets directory is empty, returns configured: False.
+    Returns configured status and sample metadata for all classes.
     """
     if not os.path.exists(DATASETS_DIR):
         return {
@@ -32,17 +32,15 @@ def get_dataset_info():
             for fname in os.listdir(split_img_dir):
                 if fname.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
                     split_counts[split] += 1
-                    # Derive sample class from filename or parent folder
                     sample_cls = fname.split('_')[0].capitalize() if '_' in fname else "General"
                     class_set.add(sample_cls)
-                    if len(samples) < 20: # Limit sample metadata size
-                        samples.append({
-                            "filename": fname,
-                            "class": sample_cls,
-                            "split": split.upper(),
-                            "annotation_status": "ANNOTATED",
-                            "image_url": f"/datasets/{split}/images/{fname}"
-                        })
+                    samples.append({
+                        "filename": fname,
+                        "class": sample_cls,
+                        "split": split.upper(),
+                        "annotation_status": "ANNOTATED",
+                        "image_url": f"/datasets/{split}/images/{fname}"
+                    })
 
     total_images = sum(split_counts.values())
 
